@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>Conexões</title>
+<title>Cadastrar Conexões</title>
 
 <style>
   body { font-family: system-ui, sans-serif; max-width: 420px; margin: 40px auto; padding: 0 16px; background: #fff; color: #222; }
@@ -13,8 +13,10 @@
   input[type=text], input[type=number], input[type=password], select { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #999; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
   .check { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
   .botoes { margin-top: 20px; display: flex; gap: 8px; }
-  button { padding: 8px 16px; font-size: 14px; border: 1px solid #666; border-radius: 4px; background: #eee; cursor: pointer; }
+  button, .btn-voltar { padding: 8px 16px; font-size: 14px; border: 1px solid #666; border-radius: 4px; background: #eee; cursor: pointer; text-decoration: none; color: #222; display: inline-flex; align-items: center; justify-content: center; }
   button:disabled { opacity: .5; cursor: not-allowed; }
+  button:hover, .btn-voltar:hover { background: #e2e2e2; }
+  .topo-acao { margin-bottom: 16px; }
   #msg { margin-top: 16px; font-size: 14px; white-space: pre-wrap; }
   .ok { color: #0a7a2f; }
   .erro { color: #b00020; }
@@ -22,6 +24,10 @@
 
 </head>
 <body>
+
+<div class="topo-acao">
+  <a href="/listar_conexoes" class="btn-voltar">← Voltar</a>
+</div>
 
 <h1>Nova conexão</h1>
 
@@ -55,11 +61,6 @@
 
   <label>Senha
     <input type="password" name="senha" required>
-  </label>
-
-  <label class="check">
-    <input type="checkbox" name="somente_leitura" value="1">
-    Somente leitura
   </label>
 
   <div class="botoes">

@@ -12,12 +12,12 @@ app = FastAPI()
 # Configura a pasta de templates (Pasta do front-end)
 templates = Jinja2Templates(directory="templates")
 
-# Rota 1: Exibir a tela
-@app.get("/")
+# Rota 1: Tela para cadastrar conexões com o banco de dados
+@app.get("/cadastrar_conexoes")
 def exibir_tela(request: Request):
     return templates.TemplateResponse(
         request=request, 
-        name="index.html", 
+        name="cadastrar_conexoes.html", 
         context={"request": request}
     )
 
@@ -63,4 +63,16 @@ def rota_testar_conexao(
         database=database,
         usuario=usuario,
         senha=senha
+    )
+
+# Rota 4: Listar as conexões salvas no banco de dados
+@app.get("/listar_conexoes")
+def listar_conexoes(request: Request, db: Session = Depends(get_db)):
+
+    lista_conexoes = conexao.listar_conexoes(db)
+    
+    return templates.TemplateResponse(
+        request=request, 
+        name="listar_conexoes.html", 
+        context={"request": request, "conexoes": lista_conexoes}
     )

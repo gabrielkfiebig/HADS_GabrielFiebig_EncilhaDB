@@ -11,3 +11,13 @@ CREATE TABLE tb_conexao (
     tipo_sgbd                 VARCHAR(20)  NOT NULL DEFAULT 'postgresql',
     data_cadastro             TIMESTAMP DEFAULT NOW()
 );
+
+
+## Rodar localmente o projeto
+
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install fastapi "uvicorn[standard]" sqlalchemy python-dotenv bcrypt psycopg2-binary jinja2 python-multipart
+
+cd app
+python -m uvicorn route:app --reload

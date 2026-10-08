@@ -3,6 +3,7 @@ from sqlalchemy import create_engine
 import bcrypt
 from db import Conexao
 
+# Função para salvar a conexão no banco de dados
 def salvar_conexao(
     nome: str,
     tipo_sgbd: str,
@@ -72,3 +73,8 @@ def testar_conexao_endpoint(
             
     except Exception as e:
         return {"status": "erro", "mensagem": str(e)}
+
+# Função para listar todas as conexões salvas no banco de dados
+def listar_conexoes(db: Session):
+    """Retorna todas as conexões cadastradas no banco de dados."""
+    return db.query(Conexao).all()
