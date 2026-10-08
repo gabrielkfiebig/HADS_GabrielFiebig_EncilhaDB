@@ -36,6 +36,7 @@
         <th>Base de Dados</th>
         <th>Host</th>
         <th></th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -48,6 +49,8 @@
         <td>
           <button type="button" class="btn-apagar" onclick="apagarConexao('{{ c.id }}', '{{ c.nome }}')">Apagar</button>
         </td>
+        <td>
+          <a href="/atualizar_conexoes/{{ c.id }}">Editar</a>
       </tr>
       {% endfor %}
     </tbody>

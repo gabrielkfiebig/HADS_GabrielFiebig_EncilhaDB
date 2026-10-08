@@ -82,3 +82,42 @@ def listar_conexoes(request: Request, db: Session = Depends(get_db)):
 def deletar_conexao(id: int, db: Session = Depends(get_db)):
     resultado = conexao.deletar_conexao(id, db)
     return resultado   
+
+# Rota 6a: Atualizar uma conexão pelo ID
+@app.post("/atualizar_conexoes/{id}")
+def atualizar_conexoes(
+    id: int,
+    nome: str = Form(...),
+    tipo_sgbd: str = Form(...),
+    host: str = Form(...),
+    porta: int = Form(...),
+    database: str = Form(...),
+    usuario: str = Form(...),
+    senha: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    resultado = conexao.atualizar_conexoes(
+        id=id,
+        nome=nome,
+        tipo_sgbd=tipo_sgbd,
+        host=host,
+        porta=porta,
+        database=database,
+        usuario=usuario,
+        senha=senha,
+        db=db
+    )
+    return resultado
+
+# Rota 6b: Exibir a tela de atualização (GET)
+@app.get("/atualizar_conexoes/{id}")
+def exibir_atualizacao(id: int, request: Request, db: Session = Depends(get_db)):
+    conexao_atual = conexao.buscar_conexao(id, db)
+    if conexao_atual is None:
+        raise HTTPException(status_code=404, detail="Conexão não encontrada")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="atualizar_conexoes.html",
+        context={"request": request, "conexao": conexao_atual}
+    )

@@ -89,3 +89,42 @@ def deletar_conexao(id: int, db: Session):
         return {"status": "sucesso", "mensagem": f"Conexão '{conexao.nome}' deletada com sucesso!"}
     else:
         return {"status": "erro", "mensagem": f"Conexão com ID '{id}' não encontrada."}
+
+# Função para atualizar uma conexão pelo ID
+def atualizar_conexoes(
+    id: int,
+    nome: str,
+    tipo_sgbd: str,
+    host: str,
+    porta: int,
+    database: str,
+    usuario: str,
+    senha: str,
+    db: Session
+):
+    """Atualiza uma conexão pelo ID."""
+    conexao = db.query(Conexao).filter(Conexao.id == id).first()
+    
+    if conexao:
+        # Atualiza os campos da conexão
+        conexao.nome = nome
+        conexao.tipo_sgbd = tipo_sgbd
+        conexao.host = host
+        conexao.porta = porta
+        conexao.database = database
+        conexao.usuario = usuario
+        
+        # Atualiza a senha apenas se for fornecida uma nova senha
+        if senha:
+            senha_bytes = senha.encode('utf-8')
+            salt = bcrypt.gensalt()
+            senha_hash = bcrypt.hashpw(senha_bytes, salt).decode('utf-8')
+            conexao.senha_criptografada = senha_hash
+        
+        db.commit()
+        return {"status": "sucesso", "mensagem": f"Conexão '{conexao.nome}' atualizada com sucesso!"}
+    else:
+        return {"status": "erro", "mensagem": f"Conexão com ID '{id}' não encontrada."}
+
+def buscar_conexao(id: int, db):
+    return db.query(Conexao).filter(Conexao.id == id).first()
