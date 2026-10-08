@@ -78,3 +78,14 @@ def testar_conexao_endpoint(
 def listar_conexoes(db: Session):
     """Retorna todas as conexões cadastradas no banco de dados."""
     return db.query(Conexao).all()
+
+# Função para deletar uma conexão pelo ID
+def deletar_conexao(id: int, db: Session):
+    """Deleta uma conexão pelo ID."""
+    conexao = db.query(Conexao).filter(Conexao.id == id).first()
+    if conexao:
+        db.delete(conexao)
+        db.commit()
+        return {"status": "sucesso", "mensagem": f"Conexão '{conexao.nome}' deletada com sucesso!"}
+    else:
+        return {"status": "erro", "mensagem": f"Conexão com ID '{id}' não encontrada."}

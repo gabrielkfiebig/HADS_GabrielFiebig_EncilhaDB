@@ -76,3 +76,9 @@ def listar_conexoes(request: Request, db: Session = Depends(get_db)):
         name="listar_conexoes.html", 
         context={"request": request, "conexoes": lista_conexoes}
     )
+
+# Rota 5: Deletar uma conexão pelo ID
+@app.post("/deletar_conexao/{id}")
+def deletar_conexao(id: int, db: Session = Depends(get_db)):
+    resultado = conexao.deletar_conexao(id, db)
+    return resultado   

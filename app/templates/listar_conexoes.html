@@ -31,10 +31,11 @@
   <table>
     <thead>
       <tr>
-        <th>Nome</th>
-        <th>Tipo</th>
+        <th>Usuário</th>
+        <th>Banco de Dados</th>
+        <th>Base de Dados</th>
         <th>Host</th>
-        <th>Banco</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -42,8 +43,11 @@
       <tr>
         <td>{{ c.nome }}</td>
         <td>{{ c.tipo_sgbd }}</td>
-        <td>{{ c.host }}:{{ c.porta }}</td>
         <td>{{ c.database }}</td>
+        <td>{{ c.host }}:{{ c.porta }}</td>
+        <td>
+          <button type="button" class="btn-apagar" onclick="apagarConexao('{{ c.id }}', '{{ c.nome }}')">Apagar</button>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -53,4 +57,29 @@
 {% endif %}
 
 </body>
+
+<script>
+  async function apagarConexao(id, nome) {
+    if (!confirm(`Tem certeza que deseja apagar a conexão "${nome}"?`)) {
+      return;
+    }
+
+    try {
+      const resp = await fetch(`/deletar_conexao/${id}`, {
+        method: 'POST'
+      });
+      const resultado = await resp.json();
+
+      if (resultado.status === 'sucesso') {
+        // Recarrega a página para atualizar a lista
+        window.location.reload();
+      } else {
+        alert(resultado.mensagem);
+      }
+    } catch (erro) {
+      alert('Erro ao se comunicar com o servidor.');
+    }
+  }
+</script>
+
 </html>
