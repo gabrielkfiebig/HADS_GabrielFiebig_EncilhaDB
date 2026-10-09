@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 import bcrypt
-from db import Conexao
+from app.backend.db import Conexao
 
 # Função para salvar a conexão no banco de dados
 def salvar_conexao(
