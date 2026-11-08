@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ListarConexoes from './pages/ListarConexoes.jsx';
 import CadastrarConexao from './pages/CadastrarConexao.jsx';
 import AtualizarConexao from './pages/AtualizarConexao.jsx';
+import AnalisarDados from './pages/AnalisarDados.jsx';
 import './styles/app.css';
 
 function App() {
@@ -9,6 +10,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<ListarConexoes />} />
+        <Route path="/analisar_dados" element={<AnalisarDados />} />
         <Route path="/cadastrar_conexoes" element={<CadastrarConexao />} />
         <Route path="/atualizar_conexoes/:id" element={<AtualizarConexao />} />
       </Routes>

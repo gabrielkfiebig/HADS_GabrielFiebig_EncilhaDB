@@ -25,3 +25,10 @@ th { background: #f5f5f5; }
 .msg { margin-top: 16px; font-size: 14px; white-space: pre-wrap; }
 .ok { color: #0a7a2f; }
 .erro { color: #b00020; }
+
+/* Seleção de dados: reutiliza os campos e botões do cadastro de conexões. */
+.analise-dados fieldset { border: 1px solid #ccc; border-radius: 4px; margin: 20px 0 0; padding: 12px; min-width: 0; }
+.analise-dados legend { font-size: 14px; font-weight: 600; padding: 0 4px; }
+.analise-dados h2 { font-size: 15px; margin: 20px 0 8px; overflow-wrap: anywhere; }
+.analise-dados .opcao-selecao { display: flex; align-items: baseline; gap: 8px; overflow-wrap: anywhere; }
+.analise-dados input[type=checkbox] { flex-shrink: 0; }

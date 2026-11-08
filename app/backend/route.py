@@ -1,106 +1,101 @@
-from fastapi import FastAPI, Depends, HTTPException
+from contextlib import asynccontextmanager
+from ipaddress import ip_address
+from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-
-# Importações do seu projeto
-from app.backend.db import get_db
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.backend.connections import conexao
+from app.backend.connections import catalogo
+from app.backend.schemas import ConsultaTabelas, ListaSchemas, ListaTabelas
+from app.backend.db import get_db, initialize_database
+from app.backend.schemas import ConexaoCreateUpdate, ConexaoPublica, ConexaoSalva, ConexaoTest, ListaConexoes
+from app.backend.settings import settings
 
-# Cria a aplicação FastAPI
-app = FastAPI(title="API de Conexões de Banco de Dados")
 
-# Configuração de CORS (Essencial para separar Front do Back)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@asynccontextmanager
+async def lifespan(app):
+    initialize_database()
+    yield
 
-# Schemas (Modelos Pydantic para receber JSON do Front-end)
 
-class ConexaoCreateUpdate(BaseModel):
-    nome: str
-    tipo_sgbd: str
-    host: str
-    porta: int
-    database: str
-    usuario: str
-    senha: str
+app = FastAPI(title="EncilhaDB — PostgreSQL local", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=list(settings.origins),
+                   allow_credentials=False, allow_methods=["GET", "POST", "PUT", "DELETE"],
+                   allow_headers=["Content-Type"])
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]"])
 
-class ConexaoTest(BaseModel):
-    tipo_sgbd: str
-    host: str
-    porta: int
-    database: str
-    usuario: str
-    senha: str
 
-# Rotas da API Restful para gerenciar conexões de banco de dados
+@app.middleware("http")
+async def acesso_local(request: Request, call_next):
+    try:
+        local = request.client and ip_address(request.client.host).is_loopback
+    except ValueError:
+        local = False
+    if not local:
+        return JSONResponse(status_code=403, content={"detail": "Acesso permitido somente na própria máquina."})
+    origin = request.headers.get("origin")
+    if origin and origin not in settings.origins:
+        return JSONResponse(status_code=403, content={"detail": "Origem não autorizada."})
+    if request.headers.get("sec-fetch-site") == "cross-site" and origin not in settings.origins:
+        return JSONResponse(status_code=403, content={"detail": "Origem não autorizada."})
+    return await call_next(request)
 
-# 1. Listar todas as conexões (GET)
-@app.get("/conexoes")
+
+@app.exception_handler(RequestValidationError)
+async def validacao_invalida(request, exc):
+    # Never echo input: validation errors can contain credentials.
+    return JSONResponse(status_code=422, content={"detail": [
+        {"loc": list(e["loc"]), "msg": e["msg"], "type": e["type"]} for e in exc.errors()]})
+
+
+@app.exception_handler(SQLAlchemyError)
+async def banco_indisponivel(request, exc):
+    return JSONResponse(status_code=503, content={"detail": "Banco da aplicação indisponível. Tente novamente."})
+
+
+@app.get("/conexoes", response_model=ListaConexoes)
 def listar_conexoes(db: Session = Depends(get_db)):
-    lista_conexoes = conexao.listar_conexoes(db)
-    return {"conexoes": lista_conexoes}
+    return {"conexoes": conexao.listar_conexoes(db)}
 
-# 2. Buscar UMA conexão específica pelo ID (GET)
-@app.get("/conexoes/{id}")
+
+@app.get("/conexoes/{id}", response_model=ConexaoPublica)
 def buscar_conexao(id: int, db: Session = Depends(get_db)):
-    conexao_atual = conexao.buscar_conexao(id, db)
-    if conexao_atual is None:
-        raise HTTPException(status_code=404, detail="Conexão não encontrada")
-    return conexao_atual
+    return conexao.buscar_conexao(id, db)
 
-# 3. Salvar nova conexão no banco (POST)
-@app.post("/conexoes")
+
+@app.post("/conexoes", status_code=201, response_model=ConexaoSalva)
 def salvar_conexao(dados: ConexaoCreateUpdate, db: Session = Depends(get_db)):
-    # Os dados chegam como JSON e o Pydantic transforma no objeto 'dados'
-    resultado = conexao.salvar_conexao(
-        nome=dados.nome,
-        tipo_sgbd=dados.tipo_sgbd,
-        host=dados.host,
-        porta=dados.porta,
-        database=dados.database,
-        usuario=dados.usuario,
-        senha=dados.senha,
-        db=db
-    )
-    return {"mensagem": "Conexão criada com sucesso!", "dados": resultado}
+    return {"mensagem": "Conexão criada com sucesso!", "dados": conexao.salvar_conexao(dados, db)}
 
-# 4. Atualizar uma conexão pelo ID (PUT)
-@app.put("/conexoes/{id}")
+
+@app.put("/conexoes/{id}", response_model=ConexaoSalva)
 def atualizar_conexao(id: int, dados: ConexaoCreateUpdate, db: Session = Depends(get_db)):
-    resultado = conexao.atualizar_conexoes(
-        id=id,
-        nome=dados.nome,
-        tipo_sgbd=dados.tipo_sgbd,
-        host=dados.host,
-        porta=dados.porta,
-        database=dados.database,
-        usuario=dados.usuario,
-        senha=dados.senha,
-        db=db
-    )
-    return {"mensagem": "Conexão atualizada com sucesso!", "dados": resultado}
+    return {"mensagem": "Conexão atualizada com sucesso!", "dados": conexao.salvar_conexao(dados, db, id)}
 
-# 5. Deletar uma conexão pelo ID (DELETE)
+
 @app.delete("/conexoes/{id}")
 def deletar_conexao(id: int, db: Session = Depends(get_db)):
-    resultado = conexao.deletar_conexao(id, db)
-    return {"mensagem": "Conexão deletada com sucesso", "resultado": resultado}
+    conexao.deletar_conexao(id, db)
+    return {"mensagem": "Conexão excluída com sucesso!"}
 
-# 6. Testar a conexão em tempo de execução (POST)
+
 @app.post("/conexoes/testar")
 def testar_conexao(dados: ConexaoTest):
-    resultado = conexao.testar_conexao_endpoint(
-        tipo_sgbd=dados.tipo_sgbd,
-        host=dados.host,
-        porta=dados.porta,
-        database=dados.database,
-        usuario=dados.usuario,
-        senha=dados.senha
-    )
-    return {"mensagem": "Teste de conexão concluído", "resultado": resultado}
+    return {"resultado": conexao.testar_conexao_endpoint(dados)}
+
+
+@app.get("/conexoes/{id}/schemas", response_model=ListaSchemas)
+def consultar_schemas(id: int, db: Session = Depends(get_db)):
+    registro = conexao.buscar_conexao(id, db)
+    with catalogo.abrir_catalogo(registro) as connection:
+        return {"schemas": catalogo.listar_schemas(connection)}
+
+
+@app.post("/conexoes/{id}/tabelas", response_model=ListaTabelas)
+def consultar_tabelas(id: int, dados: ConsultaTabelas, db: Session = Depends(get_db)):
+    registro = conexao.buscar_conexao(id, db)
+    with catalogo.abrir_catalogo(registro) as connection:
+        return {"tabelas": catalogo.listar_tabelas(connection, dados.schemas)}
