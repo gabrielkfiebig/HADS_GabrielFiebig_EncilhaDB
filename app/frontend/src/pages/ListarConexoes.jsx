@@ -53,7 +53,7 @@ export default function ListarConexoes() {
         <h1>Conexões cadastradas</h1>
         <Link to="/cadastrar_conexoes" className="btn-acao">Nova conexão</Link>
       </div>
-      <div className="topo-acao"><Link to="/analisar_dados" className="btn-acao">Analisar dados</Link></div>
+      <div className="topo-acao acoes-relacao"><Link to="/analisar_dados" className="btn-acao">Analisar dados</Link><Link to="/analises_salvas" className="btn-acao">Análises salvas</Link></div>
       <p className="dica">Suporte a PostgreSQL. As credenciais são protegidas pelo Windows.</p>
       {erro && <div className="msg erro" role="alert">{erro} <button type="button" onClick={carregarConexoes} disabled={carregando || excluindo !== null}>Tentar novamente</button></div>}
       {carregando ? <div className="msg" role="status">Carregando conexões...</div> : conexoes.length > 0 ? (

@@ -44,3 +44,6 @@ export const analisarMetadados = (id, schemas, tabelas) => request(`/conexoes/${
   method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ schemas, tabelas }), timeout: 120000,
 });
+export const listarAnalises = () => request('/analises');
+export const buscarAnalise = id => request(`/analises/${id}`);
+export const salvarAnalise = (dados, id) => jsonRequest(id ? `/analises/${id}` : '/analises', id ? 'PUT' : 'POST', dados);

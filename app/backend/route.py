@@ -15,6 +15,8 @@ from app.backend.schemas import ConsultaTabelas, ListaSchemas, ListaTabelas
 from app.backend.db import get_db, initialize_database
 from app.backend.schemas import ConexaoCreateUpdate, ConexaoPublica, ConexaoSalva, ConexaoTest, ListaConexoes
 from app.backend.settings import settings
+from app.backend import analises
+from app.backend.schemas import SalvarAnalise, AnaliseCompleta, ListaAnalises
 
 
 @asynccontextmanager
@@ -108,3 +110,23 @@ def analisar_metadados(id: int, dados: PedidoAnalise, db: Session = Depends(get_
     registro = conexao.buscar_conexao(id, db)
     with catalogo.abrir_catalogo(registro) as connection:
         return analise.analisar(connection, registro, dados)
+
+
+@app.get("/analises", response_model=ListaAnalises)
+def listar_analises(db: Session = Depends(get_db)):
+    return {"analises": analises.listar(db)}
+
+
+@app.post("/analises", response_model=AnaliseCompleta, status_code=201)
+def salvar_analise(dados: SalvarAnalise, db: Session = Depends(get_db)):
+    return analises.salvar(dados, db)
+
+
+@app.get("/analises/{id}", response_model=AnaliseCompleta)
+def buscar_analise(id: int, db: Session = Depends(get_db)):
+    return analises.buscar(id, db)
+
+
+@app.put("/analises/{id}", response_model=AnaliseCompleta)
+def atualizar_analise(id: int, dados: SalvarAnalise, db: Session = Depends(get_db)):
+    return analises.salvar(dados, db, id)

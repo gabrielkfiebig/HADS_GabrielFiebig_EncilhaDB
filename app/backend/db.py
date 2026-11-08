@@ -1,4 +1,5 @@
-from sqlalchemy import CheckConstraint, Column, DateTime, Integer, String, UniqueConstraint, create_engine, inspect, text
+from datetime import datetime, timezone
+from sqlalchemy import CheckConstraint, Column, DateTime, Integer, JSON, String, Text, UniqueConstraint, create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.backend.settings import settings
 
@@ -26,8 +27,20 @@ class Conexao(Base):
     data_cadastro = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
 
 
+class Analise(Base):
+    __tablename__ = "tb_analise"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nome = Column(String(100), nullable=False)
+    descricao = Column(Text, nullable=False, default="")
+    database = Column(String(100), nullable=False)
+    # A snapshot remains available even if its source connection is deleted.
+    conexao_id = Column(Integer, nullable=False)
+    conteudo = Column(JSON, nullable=False)
+    data_criacao = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+
 def initialize_database():
-    """Creates new installations; never migrates existing tables automatically."""
+    """Creates missing tables; never alters existing tables automatically."""
     inspector = inspect(engine)
     if inspector.has_table("tb_conexao"):
         columns = {c["name"] for c in inspector.get_columns("tb_conexao")}
@@ -39,6 +52,7 @@ def initialize_database():
             raise RuntimeError("Banco legado: revise e execute manualmente app/backend/migrations/001_parametros_sem_senha.sql antes de iniciar.")
     else:
         Base.metadata.create_all(bind=engine)
+    Analise.__table__.create(bind=engine, checkfirst=True)
 
 
 def get_db():

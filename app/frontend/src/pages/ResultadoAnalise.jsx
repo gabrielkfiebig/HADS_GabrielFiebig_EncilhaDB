@@ -2,19 +2,23 @@ import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import GrafoRelacoes from '../components/GrafoRelacoes.jsx';
 import EditarRelacao from '../components/EditarRelacao.jsx';
+import SalvarAnaliseForm from '../components/SalvarAnaliseForm.jsx';
 
 const tipoRelacao = r => r.confirmada === true ? 'Relação' : 'Possível relação';
 const confirmacao = r => r.confirmada === true ? <span className="relacao-confirmada" role="img" aria-label="Relação confirmada" title="Relação confirmada">✓</span> : null;
 const assinatura = r => JSON.stringify([r.origem, r.destino, r.colunas_origem.map((c, i) => JSON.stringify([c, r.colunas_destino[i]])).sort()]);
 
-export default function ResultadoAnalise() {
+export default function ResultadoAnalise({ analiseSalva }) {
   const { state, pathname, search, hash } = useLocation();
   const navigate = useNavigate();
-  const analise = state?.analise;
+  const analise = state?.analise || analiseSalva?.conteudo;
+  const salva = state?.salva || analiseSalva;
   const [selecionada, setSelecionada] = useState(null);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(true);
   const [edicao, setEdicao] = useState(null);
-  const [mensagem, setMensagem] = useState('');
+  const [mensagem, setMensagem] = useState(state?.avisoSalvamento || '');
+  const [formSalvar, setFormSalvar] = useState(false);
+  const [salvando, setSalvando] = useState(false);
   const relacoes = useMemo(() => analise?.relacoes.filter(r => mostrarSugestoes || r.confirmada === true) || [], [analise, mostrarSugestoes]);
   if (!analise) return <div className="container-form">
     <h1>Análise de metadados</h1>
@@ -29,7 +33,7 @@ export default function ResultadoAnalise() {
   const atualizarRelacoes = novas => {
     const ligadas = new Set(novas.flatMap(r => [r.origem, r.destino]));
     const atualizada = { ...analise, relacoes: novas, sem_relacao: analise.tabelas.filter(t => !ligadas.has(t.id)).map(t => t.id) };
-    navigate({ pathname, search, hash }, { replace: true, state: { ...state, analise: atualizada } });
+    navigate({ pathname, search, hash }, { replace: true, state: { ...state, analise: atualizada, alterada: true } });
   };
   const salvarRelacao = nova => {
     if (analise.relacoes.some((r, i) => i !== edicao.indice && assinatura(r) === assinatura(nova))) return 'Já existe uma relação entre essas tabelas com os mesmos pares de colunas.';
@@ -56,13 +60,26 @@ export default function ResultadoAnalise() {
     setEdicao({ indice: null, criacao: true, relacao: { origem: t.id, destino: '', colunas_origem: [''], colunas_destino: [''], confirmada: false } });
   };
   const acoes = r => <div className="acoes-relacao">
-    {r.confirmada !== true && <button type="button" onClick={() => confirmarRelacao(r)}>Confirmar relação</button>}
-    <button type="button" onClick={() => { setEdicao({ indice: analise.relacoes.indexOf(r), relacao: r }); setMensagem(''); }}>Editar</button>
-    <button type="button" onClick={() => removerRelacao(r)}>Remover</button>
+    {r.confirmada !== true && <button type="button" disabled={salvando} onClick={() => confirmarRelacao(r)}>Confirmar relação</button>}
+    <button type="button" disabled={salvando} onClick={() => { setEdicao({ indice: analise.relacoes.indexOf(r), relacao: r }); setMensagem(''); setFormSalvar(false); }}>Editar</button>
+    <button type="button" disabled={salvando} onClick={() => removerRelacao(r)}>Remover</button>
   </div>;
+  const aoSalvar = resultado => {
+    setSalvando(false);
+    setFormSalvar(false);
+    setMensagem('Análise salva com sucesso no EncilhaDB.');
+    navigate(`/analises_salvas/${resultado.id}`, { replace: true, state: {
+      analise: resultado.conteudo, salva: resultado, alterada: false,
+      avisoSalvamento: 'Análise salva com sucesso no EncilhaDB.',
+    } });
+  };
   return <div className="container-analise">
-    <div className="topo-acao"><Link to="/analisar_dados" className="btn-voltar">← Nova análise</Link></div>
-    <h1>Análise de metadados</h1>
+    <div className="topo-acao acoes-relacao"><Link to="/analisar_dados" className="btn-voltar">← Nova análise</Link><Link to="/analises_salvas" className="btn-acao">Análises salvas</Link></div>
+    <h1>{salva?.nome || 'Análise de metadados'}</h1>
+    {salva && <><p className="descricao-relacao">{salva.descricao}</p><p className="dica">Data de criação: {new Date(salva.data_criacao).toLocaleString('pt-BR')}.</p></>}
+    <div className="botoes"><button type="button" disabled={salvando || !!edicao} onClick={() => setFormSalvar(true)}>{salva ? 'Salvar alterações' : 'Salvar análise'}</button></div>
+    <p className="dica">{salva ? state?.alterada ? 'Há alterações não salvas nesta análise.' : 'Análise salva no EncilhaDB.' : 'Esta análise ainda não foi salva.'}</p>
+    {formSalvar && <SalvarAnaliseForm analise={analise} salva={salva} onSalva={aoSalvar} onOcupado={setSalvando} onCancelar={() => setFormSalvar(false)} />}
     <div className="msg ok" role="status">Análise concluída com sucesso. {analise.tabelas.length} tabela(s) analisada(s).</div>
     <p>{analise.conexao.nome} — {analise.conexao.database}</p>
     <p className="dica">Schemas: {analise.schemas.join(', ')}. Analisado em {new Date(analise.analisado_em).toLocaleString('pt-BR')}.</p>
@@ -80,7 +97,7 @@ export default function ResultadoAnalise() {
       <aside className="analise-painel" aria-label="Tabelas sem relação">
         <h2>Tabelas sem relação ({isoladas.length})</h2>
         <p className="dica">Tabelas sem nenhuma ligação nesta análise. Use + para criar uma relação.</p>
-        {isoladas.length ? <ul className="lista-isoladas">{isoladas.map(t => <li key={t.id} className="tabela-isolada"><button type="button" onClick={() => setSelecionada(t.id)}>{t.schema}.{t.nome}</button><button type="button" className="adicionar-relacao" aria-label={`Criar relação para ${t.schema}.${t.nome}`} title="Criar relação" onClick={() => criarRelacao(t)}>+</button></li>)}</ul> : <p className="vazio">Todas as tabelas possuem relação.</p>}
+        {isoladas.length ? <ul className="lista-isoladas">{isoladas.map(t => <li key={t.id} className="tabela-isolada"><button type="button" onClick={() => setSelecionada(t.id)}>{t.schema}.{t.nome}</button><button type="button" disabled={salvando} className="adicionar-relacao" aria-label={`Criar relação para ${t.schema}.${t.nome}`} title="Criar relação" onClick={() => { criarRelacao(t); setFormSalvar(false); }}>+</button></li>)}</ul> : <p className="vazio">Todas as tabelas possuem relação.</p>}
       </aside>
     </div>
     {tabela && <section className="analise-painel" aria-label="Ligações da tabela selecionada">

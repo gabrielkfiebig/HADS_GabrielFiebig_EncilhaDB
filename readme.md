@@ -1,6 +1,6 @@
 # EncilhaDB
 
-Aplicação local para cadastrar, listar, testar, editar e excluir parâmetros de conexões PostgreSQL. Frontend React/Vite, API FastAPI e armazenamento PostgreSQL.
+Aplicação local para gerenciar conexões PostgreSQL, analisar relações entre tabelas e salvar os resultados no banco do EncilhaDB. Frontend React/Vite, API FastAPI e armazenamento PostgreSQL.
 
 ## Limites desta entrega
 
@@ -74,7 +74,7 @@ psql -h localhost -U postgres -d encilhadb -v ON_ERROR_STOP=1 -f app/backend/mig
 
 O script normaliza parâmetros, adiciona restrições e remove definitivamente a coluna de hashes. Não apaga conexões cadastradas. Tudo ocorre em uma transação; inconsistências abortam a migração. Execute uma única vez. Se ocorrer um erro no pgAdmin, encerre a transação com `ROLLBACK;` antes de tentar novamente.
 
-Instalações novas criam a tabela já no formato atual ao iniciar a API.
+Instalações novas criam as tabelas já no formato atual ao iniciar a API. A tabela `tb_analise` é criada automaticamente, caso ainda não exista, também em instalações atuais. Essa adição não altera tabelas existentes nem dispensa a migração manual de conexões legadas.
 
 ## Executar
 
@@ -157,12 +157,26 @@ As tabelas sem relação ficam somente na lista lateral e não participam do pos
 
 Criar, editar, confirmar ou remover uma relação atualiza o grafo, os tamanhos dos círculos, as ligações, as contagens e a lista de tabelas sem relação. Títulos e descrições aparecem nas listas e na identificação das arestas do grafo. As ações também ficam disponíveis em **Detalhes das relações**. As alterações pertencem apenas ao resultado da análise e são mantidas no estado da navegação, inclusive ao recarregar essa entrada do histórico. Uma nova análise consulta novamente os metadados originais e começa sem confirmações. Nenhuma chave estrangeira, coluna ou registro é alterado no PostgreSQL.
 
-Clique em um círculo para destacar todas as suas ligações e as tabelas conectadas. Um painel mostra as relações de entrada e saída, com tabelas e colunas de origem/destino, seguindo o filtro de possíveis relações. Clique nas tabelas desse painel para navegar pela rede. Clique novamente no círculo ou em **Mostrar toda a rede** para remover o destaque. As colunas e os tipos continuam disponíveis abaixo. O grafo se ajusta à área disponível, sem botões de zoom nem barras de rolagem. Segure o botão esquerdo do mouse e arraste para mover a visão em qualquer direção. Use **Ctrl + rolagem do mouse** sobre o grafo para ampliar ou reduzir em torno do cursor; a rolagem sem Ctrl continua rolando a página. As tabelas sem relação permanecem na lista lateral. Referências para tabelas fora da seleção são informadas separadamente. O resultado é um retrato dos metadados no momento da análise e acompanha a navegação para a tela de resultado; não há histórico persistido no banco.
+Clique em um círculo para destacar todas as suas ligações e as tabelas conectadas. Um painel mostra as relações de entrada e saída, com tabelas e colunas de origem/destino, seguindo o filtro de possíveis relações. Clique nas tabelas desse painel para navegar pela rede. Clique novamente no círculo ou em **Mostrar toda a rede** para remover o destaque. As colunas e os tipos continuam disponíveis abaixo. O grafo se ajusta à área disponível, sem botões de zoom nem barras de rolagem. Segure o botão esquerdo do mouse e arraste para mover a visão em qualquer direção. Use **Ctrl + rolagem do mouse** sobre o grafo para ampliar ou reduzir em torno do cursor; a rolagem sem Ctrl continua rolando a página. As tabelas sem relação permanecem na lista lateral. Referências para tabelas fora da seleção são informadas separadamente. O resultado é um retrato dos metadados no momento da análise. Para guardá-lo permanentemente no banco do EncilhaDB, utilize **Salvar análise**.
+
+## Salvar e reabrir análises
+
+1. Na tela de resultado, clique em **Salvar análise**.
+2. Informe um nome (obrigatório, até 100 caracteres) e uma descrição (opcional, até 4.000 caracteres).
+3. O campo **Database** é preenchido automaticamente pela conexão de origem e aparece somente para leitura. O servidor verifica essa origem e impede sua alteração, inclusive ao atualizar uma análise salva.
+4. Clique em **Confirmar salvamento**. Tabelas, schemas, metadados, relações detectadas/criadas/editadas, títulos, descrições e confirmações são persistidos em `tb_analise`, no PostgreSQL configurado em `DATABASE_URL` do EncilhaDB.
+5. Abra **Análises salvas** na lista de conexões ou na tela de resultado. A tela `/analises_salvas` mostra nome, descrição, database, data de criação e **Abrir análise**, com as mais recentes primeiro.
+6. O endereço `/analises_salvas/{id}` recupera o resultado diretamente do banco, inclusive após fechar o navegador. Não consulta o banco de origem nem exige sua senha para mostrar o resultado salvo.
+7. Após revisar relações, clique em **Salvar alterações** para atualizar a mesma análise. No formulário, somente a descrição pode ser editada: o nome fica bloqueado após a criação, assim como o database. A API também rejeita tentativas de alterar o nome. A data de criação é preservada. A tela indica quando há alterações ainda não salvas.
+
+Uma análise salva permanece disponível mesmo que a conexão de origem seja posteriormente alterada ou excluída. Para salvar uma análise nova, a conexão deve existir e seu database deve continuar correspondendo à origem da análise. Os snapshots armazenam metadados, sem credenciais. As rotas `POST /analises`, `GET /analises`, `GET /analises/{id}` e `PUT /analises/{id}` usam o banco da aplicação e seguem as mesmas restrições de acesso local da API.
+
+Reinicie a API após atualizar o código para carregar essas rotas e criar/verificar a tabela de análises. Não é preciso iniciar outra instância caso a API já esteja em execução: encerre-a no terminal antes de reiniciar.
 
 Conexões cadastradas antes deste recurso precisam ser editadas e salvas uma vez: a versão anterior descartava as senhas. Se a credencial estiver ausente, corrompida ou pertencer a outro usuário do Windows, a tela orienta editar a conexão. Não é necessária uma nova migração do banco para este recurso. Ao excluir uma conexão, sua credencial protegida também é removida.
 
 A API utiliza:
-- `201`: conexão criada.
+- `201`: conexão ou análise criada.
 - `200`: consulta, teste, atualização ou exclusão concluídos.
 - `400`: teste de conexão malsucedido.
 - `403`: cliente, origem ou destino não autorizado.

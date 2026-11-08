@@ -24,6 +24,8 @@ from app.backend.db import Base, Conexao, get_db
 from app.backend.route import app
 from app.backend.schemas import ConexaoCreateUpdate
 from app.backend.settings import load_settings
+from app.backend.db import Analise
+from app.backend import analises
 
 
 class ApiTests(unittest.TestCase):
@@ -191,6 +193,113 @@ class ApiTests(unittest.TestCase):
             self.assertNotIn("senha", json.dumps(result))
             self.assertEqual(self.request("POST", f"/conexoes/{id}/analises", {**body, "tabelas": []})[0], 422)
             self.assertEqual(self.request("POST", f"/conexoes/{id}/analises", {**body, "senha": "segredo"})[0], 422)
+
+    def analysis_payload(self):
+        _, saved = self.request("POST", "/conexoes", self.data)
+        return {"nome": "Mapa comercial", "descricao": "Relações revisadas", "conexao_id": saved["dados"]["id"], "database_origem": "banco",
+                "snapshot": {"analisado_em": "2026-11-08T12:00:00Z", "schemas": ["public"], "avisos": [],
+                    "tabelas": [{"id": "clientes", "schema": "public", "nome": "clientes", "colunas": [
+                        {"nome": "id", "tipo": "INTEGER", "aceita_nulo": False, "chave_primaria": True}], "chaves_unicas": [["id"]]},
+                        {"id": "pedidos", "schema": "public", "nome": "pedidos", "colunas": [
+                        {"nome": "cliente_id", "tipo": "INTEGER", "aceita_nulo": False, "chave_primaria": False}], "chaves_unicas": []}],
+                    "relacoes": [{"origem": "pedidos", "destino": "clientes", "colunas_origem": ["cliente_id"], "colunas_destino": ["id"],
+                                  "nome": "Relação criada na análise", "tipo": "manual", "confirmada": True, "titulo": "Pedidos do cliente", "descricao": "Revisada pelo usuário"}]}}
+
+    def test_saved_analysis_round_trip_and_creation_date(self):
+        payload = self.analysis_payload()
+        with patch.object(catalogo, "abrir_catalogo") as remote:
+            status, saved = self.request("POST", "/analises", payload)
+            self.assertEqual(status, 201)
+            id = saved["id"]
+            self.assertEqual(saved["database"], "banco")
+            self.assertEqual(saved["conteudo"]["conexao"]["database"], "banco")
+            self.assertTrue(saved["data_criacao"].endswith("Z") or saved["data_criacao"].endswith("+00:00"))
+            self.session.expire_all()
+            status, loaded = self.request("GET", f"/analises/{id}")
+            self.assertEqual(status, 200)
+            self.assertEqual(loaded["conteudo"]["relacoes"], payload["snapshot"]["relacoes"])
+            self.assertEqual(loaded["conteudo"]["sem_relacao"], [])
+            self.assertEqual(self.request("GET", "/analises")[1]["analises"][0]["nome"], "Mapa comercial")
+            self.assertNotIn("conteudo", self.request("GET", "/analises")[1]["analises"][0])
+            payload["descricao"] = "Descrição revisada"
+            payload["snapshot"]["relacoes"] = []
+            status, updated = self.request("PUT", f"/analises/{id}", payload)
+            self.assertEqual(status, 200)
+            self.assertEqual(updated["data_criacao"], saved["data_criacao"])
+            self.assertEqual(updated["conteudo"]["sem_relacao"], ["clientes", "pedidos"])
+            self.assertEqual(updated["nome"], "Mapa comercial")
+            self.assertEqual(updated["descricao"], "Descrição revisada")
+            remote.assert_not_called()
+
+    def test_saved_analysis_database_is_immutable_and_survives_connection_removal(self):
+        payload = self.analysis_payload()
+        _, saved = self.request("POST", "/analises", payload)
+        id = saved["id"]
+        for override in ({"database": "forjado"}, {"database_origem": "outro"}, {"conexao_id": 999}):
+            status, _ = self.request("PUT", f"/analises/{id}", {**payload, **override})
+            self.assertIn(status, (409, 422))
+        # Renaming/changing the source does not change the saved database snapshot.
+        self.session.get(Conexao, payload["conexao_id"]).database = "renomeado"
+        self.session.commit()
+        self.assertEqual(self.request("POST", "/analises", payload)[0], 409)
+        self.assertEqual(self.request("DELETE", f'/conexoes/{payload["conexao_id"]}')[0], 200)
+        self.assertEqual(self.request("GET", f"/analises/{id}")[1]["database"], "banco")
+        payload["descricao"] = "Revisada sem a conexão"
+        self.assertEqual(self.request("PUT", f"/analises/{id}", payload)[0], 200)
+
+    def test_saved_analysis_name_cannot_be_changed_through_api(self):
+        payload = self.analysis_payload()
+        _, saved = self.request("POST", "/analises", payload)
+        id = saved["id"]
+        invalid = {**payload, "nome": "Outro nome", "descricao": "Não deve gravar"}
+        status, body = self.request("PUT", f"/analises/{id}", invalid)
+        self.assertEqual(status, 409)
+        self.assertIn("nome", body["detail"])
+        loaded = self.request("GET", f"/analises/{id}")[1]
+        self.assertEqual(loaded["nome"], saved["nome"])
+        self.assertEqual(loaded["descricao"], saved["descricao"])
+        self.assertEqual(loaded["conteudo"], saved["conteudo"])
+
+    def test_saved_analysis_rejects_invalid_graph_and_credentials(self):
+        import copy
+        payload = self.analysis_payload()
+        for modify in (
+            lambda p: p.update(nome=" "),
+            lambda p: p.update(database="forjado"),
+            lambda p: p["snapshot"].update(senha="segredo"),
+            lambda p: p["snapshot"]["relacoes"][0].update(origem="inexistente"),
+            lambda p: p["snapshot"]["relacoes"][0].update(colunas_destino=["coluna_inexistente"]),
+            lambda p: p["snapshot"]["relacoes"][0].update(colunas_destino=[]),
+        ):
+            invalid = copy.deepcopy(payload)
+            modify(invalid)
+            status, body = self.request("POST", "/analises", invalid)
+            self.assertEqual(status, 422, body)
+            self.assertNotIn("segredo", json.dumps(body))
+        self.assertEqual(self.session.query(Analise).count(), 0)
+        self.assertEqual(self.request("GET", "/analises/999")[0], 404)
+        self.assertEqual(self.request("PUT", "/analises/999", payload)[0], 404)
+        self.assertEqual(self.request("POST", "/analises", {**payload, "conexao_id": 999})[0], 404)
+
+    def test_saved_analysis_rollback_and_list_order(self):
+        payload = self.analysis_payload()
+        with patch.object(self.session, "commit", side_effect=OperationalError("secret", {}, Exception("secret"))):
+            self.assertEqual(self.request("POST", "/analises", payload)[0], 503)
+        self.assertEqual(self.session.query(Analise).count(), 0)
+        _, first = self.request("POST", "/analises", payload)
+        _, second = self.request("POST", "/analises", {**payload, "nome": "Outra análise"})
+        self.assertEqual([a["id"] for a in self.request("GET", "/analises")[1]["analises"]], [second["id"], first["id"]])
+
+    def test_initialization_adds_analysis_table_without_altering_existing_tables(self):
+        inspector = MagicMock()
+        inspector.has_table.return_value = True
+        inspector.get_columns.return_value = [{"name": "id"}]
+        inspector.get_unique_constraints.return_value = [{"name": "uq_conexao_nome"}, {"name": "uq_conexao_destino"}]
+        inspector.get_check_constraints.return_value = [{"name": "ck_conexao_porta"}, {"name": "ck_conexao_sgbd"}]
+        with patch.object(database, "inspect", return_value=inspector), patch.object(Analise.__table__, "create") as create, patch.object(Base.metadata, "create_all") as create_all:
+            database.initialize_database()
+            create.assert_called_once_with(bind=database.engine, checkfirst=True)
+            create_all.assert_not_called()
 
 
 class CatalogTests(unittest.TestCase):
