@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.backend.connections import conexao
 from app.backend.connections import catalogo
+from app.backend.connections import analise
+from app.backend.schemas import PedidoAnalise
 from app.backend.schemas import ConsultaTabelas, ListaSchemas, ListaTabelas
 from app.backend.db import get_db, initialize_database
 from app.backend.schemas import ConexaoCreateUpdate, ConexaoPublica, ConexaoSalva, ConexaoTest, ListaConexoes
@@ -99,3 +101,10 @@ def consultar_tabelas(id: int, dados: ConsultaTabelas, db: Session = Depends(get
     registro = conexao.buscar_conexao(id, db)
     with catalogo.abrir_catalogo(registro) as connection:
         return {"tabelas": catalogo.listar_tabelas(connection, dados.schemas)}
+
+
+@app.post("/conexoes/{id}/analises")
+def analisar_metadados(id: int, dados: PedidoAnalise, db: Session = Depends(get_db)):
+    registro = conexao.buscar_conexao(id, db)
+    with catalogo.abrir_catalogo(registro) as connection:
+        return analise.analisar(connection, registro, dados)

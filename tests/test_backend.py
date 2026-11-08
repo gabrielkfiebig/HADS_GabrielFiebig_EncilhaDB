@@ -19,6 +19,7 @@ from sqlalchemy.pool import StaticPool
 from app.backend import db as database
 from app.backend.connections import conexao
 from app.backend.connections import catalogo, credenciais
+from app.backend.connections import analise
 from app.backend.db import Base, Conexao, get_db
 from app.backend.route import app
 from app.backend.schemas import ConexaoCreateUpdate
@@ -178,6 +179,18 @@ class ApiTests(unittest.TestCase):
             status, body = self.request("GET", f"/conexoes/{id}/schemas")
             self.assertEqual(status, 409)
             self.assertIn("Edite e salve", body["detail"])
+
+    def test_analysis_endpoint_uses_only_selected_metadata(self):
+        _, saved = self.request("POST", "/conexoes", self.data)
+        id = saved["dados"]["id"]
+        body = {"schemas": ["public"], "tabelas": [{"schema": "public", "nome": "clientes"}]}
+        with patch.object(catalogo, "abrir_catalogo"), patch.object(analise, "analisar", return_value={"tabelas": [], "relacoes": []}) as analisar:
+            status, result = self.request("POST", f"/conexoes/{id}/analises", body)
+            self.assertEqual(status, 200)
+            self.assertEqual(analisar.call_args.args[2].tabelas[0].nome, "clientes")
+            self.assertNotIn("senha", json.dumps(result))
+            self.assertEqual(self.request("POST", f"/conexoes/{id}/analises", {**body, "tabelas": []})[0], 422)
+            self.assertEqual(self.request("POST", f"/conexoes/{id}/analises", {**body, "senha": "segredo"})[0], 422)
 
 
 class CatalogTests(unittest.TestCase):

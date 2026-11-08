@@ -81,3 +81,16 @@ class TabelaDisponivel(BaseModel):
 
 class ListaTabelas(BaseModel):
     tabelas: list[TabelaDisponivel]
+
+
+Identificador = Annotated[str, StringConstraints(min_length=1, max_length=63)]
+
+
+class TabelaSelecionada(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    schema_nome: Identificador = Field(alias="schema")
+    nome: Identificador
+
+
+class PedidoAnalise(ConsultaTabelas):
+    tabelas: list[TabelaSelecionada] = Field(min_length=1, max_length=500)

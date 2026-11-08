@@ -4,10 +4,11 @@ const campos = { nome: 'Nome', host: 'Host', porta: 'Porta', database: 'Banco de
   usuario: 'Usuário', senha: 'Senha', tipo_sgbd: 'Tipo de SGBD' };
 
 export async function request(path, options = {}) {
+  const { timeout = 15000, ...fetchOptions } = options;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), timeout);
   try {
-    const resp = await fetch(`${API_URL}${path}`, { ...options, signal: controller.signal });
+    const resp = await fetch(`${API_URL}${path}`, { ...fetchOptions, signal: controller.signal });
     const data = await resp.json().catch(() => null);
     if (!resp.ok) {
       const detail = data?.detail;
@@ -39,3 +40,7 @@ export const atualizarConexao = (id, data) => jsonRequest(`/conexoes/${id}`, 'PU
 export const excluirConexao = id => request(`/conexoes/${id}`, { method: 'DELETE' });
 export const listarSchemas = id => request(`/conexoes/${id}/schemas`);
 export const listarTabelas = (id, schemas) => jsonRequest(`/conexoes/${id}/tabelas`, 'POST', { schemas });
+export const analisarMetadados = (id, schemas, tabelas) => request(`/conexoes/${id}/analises`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ schemas, tabelas }), timeout: 120000,
+});

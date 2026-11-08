@@ -1,21 +1,23 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import AnalisarDados from './AnalisarDados.jsx';
 import * as api from '../services/api.js';
 
-vi.mock('../services/api.js', () => ({ listarConexoes: vi.fn(), listarSchemas: vi.fn(), listarTabelas: vi.fn() }));
+vi.mock('../services/api.js', () => ({ listarConexoes: vi.fn(), listarSchemas: vi.fn(), listarTabelas: vi.fn(), analisarMetadados: vi.fn() }));
 beforeEach(() => {
   vi.resetAllMocks();
   api.listarConexoes.mockResolvedValue({ conexoes: [{ id: 1, nome: 'Principal', database: 'db1' }, { id: 2, nome: 'Secundária', database: 'db2' }] });
   api.listarSchemas.mockResolvedValue({ schemas: ['public', 'vendas', 'vazio'] });
   api.listarTabelas.mockResolvedValue({ tabelas: [{ schema: 'public', nome: 'clientes', tipo: 'tabela' }, { schema: 'vendas', nome: 'clientes', tipo: 'tabela' }] });
+  api.analisarMetadados.mockResolvedValue({ tabelas: [], relacoes: [] });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 async function abrirSchemas() {
-  render(<MemoryRouter><AnalisarDados /></MemoryRouter>);
+  function Resultado() { const { state } = useLocation(); return <div>Resultado carregado: {state.analise.relacoes.length}</div>; }
+  render(<MemoryRouter><Routes><Route path="/" element={<AnalisarDados />} /><Route path="/analises" element={<Resultado />} /></Routes></MemoryRouter>);
   fireEvent.change(await screen.findByLabelText('Conexão disponível'), { target: { value: '1' } });
   await screen.findByLabelText('public');
 }
@@ -43,10 +45,26 @@ it('consulta uma conexão, confirma múltiplos schemas e agrupa tabelas sem conf
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
   fireEvent.click(analisar);
   expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Este processo pode demorar'));
-  expect(screen.queryByText(/Seleção confirmada\./)).toBeNull();
+  expect(api.analisarMetadados).not.toHaveBeenCalled();
   confirm.mockReturnValue(true);
   fireEvent.click(analisar);
-  expect(screen.getByText(/nenhum processamento foi iniciado/)).toBeDefined();
+  await screen.findByText('Resultado carregado: 0');
+  expect(api.analisarMetadados).toHaveBeenCalledWith('1', ['public', 'vendas', 'vazio'], [{ schema: 'public', nome: 'clientes' }, { schema: 'vendas', nome: 'clientes' }]);
+});
+
+it('mantém a seleção após falha na análise e impede execução duplicada', async () => {
+  api.analisarMetadados.mockRejectedValueOnce(new Error('Falha na consulta de metadados.'));
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  await abrirTabelas();
+  fireEvent.click(within(screen.getByRole('region', { name: 'Schema public' })).getByLabelText('clientes'));
+  const botao = screen.getByRole('button', { name: 'Analisar dados' });
+  fireEvent.click(botao);
+  fireEvent.click(botao);
+  await screen.findByText('Falha na consulta de metadados.');
+  expect(api.analisarMetadados).toHaveBeenCalledTimes(1);
+  expect(within(screen.getByRole('region', { name: 'Schema public' })).getByLabelText('clientes').checked).toBe(true);
+  fireEvent.click(botao);
+  await screen.findByText('Resultado carregado: 0');
 });
 
 it('limpa tabelas ao mudar schemas e recarrega schemas ao mudar conexão', async () => {

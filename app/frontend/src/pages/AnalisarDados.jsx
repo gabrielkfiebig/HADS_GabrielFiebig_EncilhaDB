@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { listarConexoes, listarSchemas, listarTabelas } from '../services/api.js';
+import { Link, useNavigate } from 'react-router-dom';
+import { analisarMetadados, listarConexoes, listarSchemas, listarTabelas } from '../services/api.js';
 
 const chaveTabela = tabela => JSON.stringify([tabela.schema, tabela.nome]);
 const alternar = (itens, item) => itens.includes(item) ? itens.filter(valor => valor !== item) : [...itens, item];
 
 export default function AnalisarDados() {
+  const navigate = useNavigate();
   const [conexoes, setConexoes] = useState([]);
   const [conexaoId, setConexaoId] = useState('');
   const [schemas, setSchemas] = useState(null);
@@ -15,7 +16,6 @@ export default function AnalisarDados() {
   const [tabelasSelecionadas, setTabelasSelecionadas] = useState([]);
   const [operacao, setOperacao] = useState('conexoes');
   const [erro, setErro] = useState('');
-  const [mensagem, setMensagem] = useState('');
   const [tentativa, setTentativa] = useState(0);
   const mounted = useRef(false);
   const bloqueio = useRef(false);
@@ -39,7 +39,6 @@ export default function AnalisarDados() {
     setConfirmados(null);
     setTabelas([]);
     setTabelasSelecionadas([]);
-    setMensagem('');
     setErro('');
   };
 
@@ -54,7 +53,6 @@ export default function AnalisarDados() {
     bloqueio.current = true;
     setOperacao(etapa);
     setErro('');
-    setMensagem('');
     if (etapa === 'schemas') limparSchemas();
     else limparTabelas();
     try {
@@ -76,10 +74,21 @@ export default function AnalisarDados() {
     }
   };
 
-  const analisar = () => {
-    if (!tabelasSelecionadas.length || !confirmados || operacao) return;
-    if (window.confirm('Você deseja analisar dados? Este processo pode demorar. Revise o que for preciso antes de confirmar.')) {
-      setMensagem('Seleção confirmada. A análise ainda não está implementada; nenhum processamento foi iniciado.');
+  const analisar = async () => {
+    if (bloqueio.current || !tabelasSelecionadas.length || !confirmados || operacao) return;
+    if (!window.confirm('Você deseja analisar dados? Este processo pode demorar. Revise o que for preciso antes de confirmar.')) return;
+    bloqueio.current = true;
+    setOperacao('analise');
+    setErro('');
+    try {
+      const selecao = tabelas.filter(t => tabelasSelecionadas.includes(chaveTabela(t))).map(t => ({ schema: t.schema, nome: t.nome }));
+      const resultado = await analisarMetadados(conexaoId, confirmados, selecao);
+      if (mounted.current) navigate('/analises', { state: { analise: resultado } });
+    } catch (error) {
+      if (mounted.current) setErro(error.message);
+    } finally {
+      bloqueio.current = false;
+      if (mounted.current) setOperacao('');
     }
   };
 
@@ -132,21 +141,20 @@ export default function AnalisarDados() {
                 {grupo.length === 0 ? <p className="vazio">Nenhuma tabela ou visão disponível neste schema.</p> : grupo.map(tabela => {
                   const chave = chaveTabela(tabela);
                   return <label key={chave} className="opcao-selecao">
-                    <input type="checkbox" checked={tabelasSelecionadas.includes(chave)} onChange={() => { setTabelasSelecionadas(itens => alternar(itens, chave)); setMensagem(''); }} /> {tabela.nome}{tabela.tipo === 'visao' ? ' (visão)' : ''}
+                    <input type="checkbox" checked={tabelasSelecionadas.includes(chave)} onChange={() => setTabelasSelecionadas(itens => alternar(itens, chave))} /> {tabela.nome}{tabela.tipo === 'visao' ? ' (visão)' : ''}
                   </label>;
                 })}
               </section>;
             })}
             <p className="dica" role="status">{tabelasSelecionadas.length} tabela(s) selecionada(s).</p>
             <div className="botoes"><button type="button" disabled={!tabelasSelecionadas.length} onClick={analisar}>Analisar dados</button></div>
-            <p className="dica">Nesta versão, a ação apenas confirma a seleção. A análise será disponibilizada futuramente.</p>
+            <p className="dica">A análise consulta os metadados das tabelas selecionadas para identificar relações.</p>
           </fieldset>}
         </form>
       )}
-      {operacao && operacao !== 'conexoes' && <div className="msg" role="status">{operacao === 'schemas' ? 'Carregando schemas...' : 'Carregando tabelas...'}</div>}
+      {operacao && operacao !== 'conexoes' && <div className="msg" role="status">{operacao === 'analise' ? 'Analisando metadados. Aguarde...' : operacao === 'schemas' ? 'Carregando schemas...' : 'Carregando tabelas...'}</div>}
       {erro && <div className="msg erro" role="alert">{erro}</div>}
       {erro && conexaoId && <div className="topo-acao"><Link to={`/atualizar_conexoes/${conexaoId}`} className="btn-acao">Editar conexão</Link></div>}
-      {mensagem && <div className="msg ok" role="status">{mensagem}</div>}
     </div>
   );
 }
