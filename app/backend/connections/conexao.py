@@ -1,4 +1,5 @@
 from collections import deque
+from datetime import datetime, timezone
 from ipaddress import ip_address
 from threading import BoundedSemaphore, Lock
 from time import monotonic
@@ -7,7 +8,8 @@ from sqlalchemy import create_engine, or_
 from sqlalchemy.engine import URL
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.pool import NullPool
-from app.backend.db import Conexao
+from app.backend.db import Conexao, ConexaoAtividade
+from app.backend.schemas import ConexaoTest
 from app.backend.settings import settings
 from app.backend.connections import credenciais
 
@@ -103,11 +105,37 @@ def salvar_conexao(dados, db, id=None):
 
 
 def listar_conexoes(db):
-    return db.query(Conexao).order_by(Conexao.id).all()
+    registros = db.query(Conexao).order_by(Conexao.id).all()
+    atividades = {a.conexao_id: a.ultimo_uso for a in db.query(ConexaoAtividade).all()}
+    for registro in registros:
+        registro.ultimo_uso = atividades.get(registro.id)
+    return registros
+
+
+def registrar_uso(registro, db):
+    atividade = db.get(ConexaoAtividade, registro.id)
+    if atividade is None:
+        atividade = ConexaoAtividade(conexao_id=registro.id)
+    atividade.ultimo_uso = datetime.now(timezone.utc)
+    db.add(atividade)
+    commit(db)
+    return atividade.ultimo_uso
+
+
+def testar_conexao_salva(id, db):
+    registro = buscar_conexao(id, db)
+    dados = ConexaoTest(**{campo: getattr(registro, campo) for campo in
+                          ("tipo_sgbd", "host", "porta", "database", "usuario")},
+                        senha=credenciais.buscar(registro))
+    resultado = testar_conexao_endpoint(dados)
+    return {"resultado": resultado, "ultimo_uso": registrar_uso(registro, db)}
 
 
 def deletar_conexao(id, db):
     registro = buscar_conexao(id, db)
     credenciais.excluir(id)
+    atividade = db.get(ConexaoAtividade, id)
+    if atividade is not None:
+        db.delete(atividade)
     db.delete(registro)
     commit(db)

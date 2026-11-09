@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import CheckConstraint, Column, DateTime, Integer, JSON, String, Text, UniqueConstraint, create_engine, inspect, text
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, create_engine, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.backend.settings import settings
 
@@ -25,6 +25,12 @@ class Conexao(Base):
     usuario = Column(String(100), nullable=False)
     tipo_sgbd = Column(String(20), nullable=False, default="postgresql")
     data_cadastro = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
+
+
+class ConexaoAtividade(Base):
+    __tablename__ = "tb_conexao_atividade"
+    conexao_id = Column(Integer, ForeignKey("tb_conexao.id", ondelete="CASCADE"), primary_key=True)
+    ultimo_uso = Column(DateTime(timezone=True), nullable=False)
 
 
 class Analise(Base):
@@ -53,6 +59,7 @@ def initialize_database():
     else:
         Base.metadata.create_all(bind=engine)
     Analise.__table__.create(bind=engine, checkfirst=True)
+    ConexaoAtividade.__table__.create(bind=engine, checkfirst=True)
 
 
 def get_db():

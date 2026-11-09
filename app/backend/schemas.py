@@ -53,6 +53,7 @@ class ConexaoPublica(BaseModel):
     database: str
     usuario: str
     data_cadastro: datetime
+    ultimo_uso: datetime | None = None
 
 
 class ListaConexoes(BaseModel):

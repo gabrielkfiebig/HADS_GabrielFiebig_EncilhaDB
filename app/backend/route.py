@@ -95,21 +95,32 @@ def testar_conexao(dados: ConexaoTest):
 def consultar_schemas(id: int, db: Session = Depends(get_db)):
     registro = conexao.buscar_conexao(id, db)
     with catalogo.abrir_catalogo(registro) as connection:
-        return {"schemas": catalogo.listar_schemas(connection)}
+        schemas = catalogo.listar_schemas(connection)
+    conexao.registrar_uso(registro, db)
+    return {"schemas": schemas}
 
 
 @app.post("/conexoes/{id}/tabelas", response_model=ListaTabelas)
 def consultar_tabelas(id: int, dados: ConsultaTabelas, db: Session = Depends(get_db)):
     registro = conexao.buscar_conexao(id, db)
     with catalogo.abrir_catalogo(registro) as connection:
-        return {"tabelas": catalogo.listar_tabelas(connection, dados.schemas)}
+        tabelas = catalogo.listar_tabelas(connection, dados.schemas)
+    conexao.registrar_uso(registro, db)
+    return {"tabelas": tabelas}
 
 
 @app.post("/conexoes/{id}/analises")
 def analisar_metadados(id: int, dados: PedidoAnalise, db: Session = Depends(get_db)):
     registro = conexao.buscar_conexao(id, db)
     with catalogo.abrir_catalogo(registro) as connection:
-        return analise.analisar(connection, registro, dados)
+        resultado = analise.analisar(connection, registro, dados)
+    conexao.registrar_uso(registro, db)
+    return resultado
+
+
+@app.post("/conexoes/{id}/testar")
+def testar_conexao_salva(id: int, db: Session = Depends(get_db)):
+    return conexao.testar_conexao_salva(id, db)
 
 
 @app.get("/analises", response_model=ListaAnalises)

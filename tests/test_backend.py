@@ -24,7 +24,7 @@ from app.backend.db import Base, Conexao, get_db
 from app.backend.route import app
 from app.backend.schemas import ConexaoCreateUpdate
 from app.backend.settings import load_settings
-from app.backend.db import Analise
+from app.backend.db import Analise, ConexaoAtividade
 from app.backend import analises
 
 
@@ -335,10 +335,38 @@ class ApiTests(unittest.TestCase):
         inspector.get_columns.return_value = [{"name": "id"}]
         inspector.get_unique_constraints.return_value = [{"name": "uq_conexao_nome"}, {"name": "uq_conexao_destino"}]
         inspector.get_check_constraints.return_value = [{"name": "ck_conexao_porta"}, {"name": "ck_conexao_sgbd"}]
-        with patch.object(database, "inspect", return_value=inspector), patch.object(Analise.__table__, "create") as create, patch.object(Base.metadata, "create_all") as create_all:
+        with patch.object(database, "inspect", return_value=inspector), patch.object(Analise.__table__, "create") as create, patch.object(ConexaoAtividade.__table__, "create") as create_activity, patch.object(Base.metadata, "create_all") as create_all:
             database.initialize_database()
             create.assert_called_once_with(bind=database.engine, checkfirst=True)
+            create_activity.assert_called_once_with(bind=database.engine, checkfirst=True)
             create_all.assert_not_called()
+
+    def test_saved_connection_test_uses_stored_secret_and_persists_last_use(self):
+        from pydantic import SecretStr
+        _, saved = self.request("POST", "/conexoes", self.data)
+        id = saved["dados"]["id"]
+        self.assertIsNone(self.request("GET", "/conexoes")[1]["conexoes"][0]["ultimo_uso"])
+        with patch.object(credenciais, "buscar", return_value=SecretStr("segredo")):
+            status, result = self.request("POST", f"/conexoes/{id}/testar")
+        self.assertEqual(status, 200)
+        self.assertEqual(result["resultado"]["status"], "sucesso")
+        self.assertIsNotNone(result["ultimo_uso"])
+        self.assertNotIn("segredo", json.dumps(result))
+        tested = self.probe.call_args.args[0]
+        self.assertEqual(tested.senha.get_secret_value(), "segredo")
+        self.assertEqual(tested.porta, self.data["porta"])
+        self.session.expire_all()
+        self.assertIsNotNone(self.request("GET", "/conexoes")[1]["conexoes"][0]["ultimo_uso"])
+        self.assertEqual(self.request("DELETE", f"/conexoes/{id}")[0], 200)
+        self.assertEqual(self.session.query(ConexaoAtividade).count(), 0)
+
+    def test_failed_saved_connection_test_does_not_register_usage(self):
+        _, saved = self.request("POST", "/conexoes", self.data)
+        id = saved["dados"]["id"]
+        with patch.object(credenciais, "buscar", side_effect=HTTPException(409, "Edite e salve a conexão novamente.")):
+            self.assertEqual(self.request("POST", f"/conexoes/{id}/testar")[0], 409)
+        self.assertEqual(self.session.query(ConexaoAtividade).count(), 0)
+        self.assertEqual(self.request("POST", "/conexoes/999/testar")[0], 404)
 
 
 class CatalogTests(unittest.TestCase):

@@ -35,6 +35,7 @@ const jsonRequest = (path, method, data) => request(path, {
 export const listarConexoes = () => request('/conexoes');
 export const buscarConexao = id => request(`/conexoes/${id}`);
 export const testarConexao = ({ nome, ...data }) => jsonRequest('/conexoes/testar', 'POST', data);
+export const testarConexaoSalva = id => request(`/conexoes/${id}/testar`, { method: 'POST' });
 export const criarConexao = data => jsonRequest('/conexoes', 'POST', data);
 export const atualizarConexao = (id, data) => jsonRequest(`/conexoes/${id}`, 'PUT', data);
 export const excluirConexao = id => request(`/conexoes/${id}`, { method: 'DELETE' });
