@@ -130,3 +130,8 @@ def buscar_analise(id: int, db: Session = Depends(get_db)):
 @app.put("/analises/{id}", response_model=AnaliseCompleta)
 def atualizar_analise(id: int, dados: SalvarAnalise, db: Session = Depends(get_db)):
     return analises.salvar(dados, db, id)
+
+
+@app.delete("/analises/{id}")
+def excluir_analise(id: int, db: Session = Depends(get_db)):
+    return analises.excluir(id, db)

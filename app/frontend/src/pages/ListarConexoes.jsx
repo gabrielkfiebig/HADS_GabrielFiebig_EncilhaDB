@@ -50,23 +50,21 @@ export default function ListarConexoes() {
   return (
     <div className="container-list">
       <div className="topo">
-        <h1>Conexões cadastradas</h1>
-        <Link to="/cadastrar_conexoes" className="btn-acao">Nova conexão</Link>
+        <div><h1>Conexões cadastradas</h1><p className="subtitulo">Gerencie seus bancos e comece a explorar novas relações.</p></div>
+        <Link to="/cadastrar_conexoes" className="btn-acao btn-primario">Nova conexão</Link>
       </div>
-      <div className="topo-acao acoes-relacao"><Link to="/analisar_dados" className="btn-acao">Analisar dados</Link><Link to="/analises_salvas" className="btn-acao">Análises salvas</Link></div>
-      <p className="dica">Suporte a PostgreSQL. As credenciais são protegidas pelo Windows.</p>
       {erro && <div className="msg erro" role="alert">{erro} <button type="button" onClick={carregarConexoes} disabled={carregando || excluindo !== null}>Tentar novamente</button></div>}
       {carregando ? <div className="msg" role="status">Carregando conexões...</div> : conexoes.length > 0 ? (
-        <table>
+        <div className="tabela-rolagem"><table>
           <thead><tr><th>Nome</th><th>Banco de Dados</th><th>Base de Dados</th><th>Host</th><th aria-label="Excluir"></th><th aria-label="Editar"></th></tr></thead>
           <tbody>{conexoes.map(c => (
             <tr key={c.id}>
               <td>{c.nome}</td><td>{c.tipo_sgbd}</td><td>{c.database}</td><td>{c.host}:{c.porta}</td>
-              <td><button type="button" disabled={excluindo !== null} onClick={() => apagarConexao(c.id, c.nome)}>{excluindo === c.id ? 'Apagando...' : 'Apagar'}</button></td>
+              <td><button className="btn-perigo" type="button" disabled={excluindo !== null} onClick={() => apagarConexao(c.id, c.nome)}>{excluindo === c.id ? 'Apagando...' : 'Apagar'}</button></td>
               <td><Link to={`/atualizar_conexoes/${c.id}`} className="btn-acao">Editar</Link></td>
             </tr>
           ))}</tbody>
-        </table>
+        </table></div>
       ) : !erro && <div className="vazio">Nenhuma conexão cadastrada até o momento.</div>}
     </div>
   );

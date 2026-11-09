@@ -9,7 +9,7 @@ export default function DescricaoTabela({ tabela, onAtualizar, disabled }) {
   const completa = tabela.descricao?.trim() && tipos.includes(tabela.tipo_principal)
     && (tabela.tipo_principal !== 'Outro / Não sei' || tabela.tipo_descricao?.trim());
   return <section className="analise-painel editor-relacao" aria-label="Descrição da tabela">
-    <h2>Descrição de tabela: {tabela.schema}.{tabela.nome} {tabela.descricao_aprovada && <Confirmacao rotulo="Descrição de tabela aprovada" />}</h2>
+    <h2>Contexto de tabela: {tabela.schema}.{tabela.nome} {tabela.descricao_aprovada && <Confirmacao rotulo="Descrição de tabela aprovada" />}</h2>
     <fieldset disabled={disabled}>
       <label htmlFor={`${id}-descricao`}>O que esta tabela representa no sistema de origem?</label>
       <p className="dica" id={`${id}-ajuda`}>Descreva brevemente sua finalidade e o que representa cada registro.</p>

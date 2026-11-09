@@ -46,4 +46,5 @@ export const analisarMetadados = (id, schemas, tabelas) => request(`/conexoes/${
 });
 export const listarAnalises = () => request('/analises');
 export const buscarAnalise = id => request(`/analises/${id}`);
+export const excluirAnalise = id => request(`/analises/${id}`, { method: 'DELETE' });
 export const salvarAnalise = (dados, id) => jsonRequest(id ? `/analises/${id}` : '/analises', id ? 'PUT' : 'POST', dados);

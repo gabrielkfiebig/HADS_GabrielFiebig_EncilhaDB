@@ -5,6 +5,7 @@ import EditarRelacao from '../components/EditarRelacao.jsx';
 import SalvarAnaliseForm from '../components/SalvarAnaliseForm.jsx';
 import DescricaoTabela from '../components/DescricaoTabela.jsx';
 import Confirmacao from '../components/Confirmacao.jsx';
+import InformacoesGrafo from '../components/InformacoesGrafo.jsx';
 
 const tipoRelacao = r => r.confirmada === true ? 'Relação' : 'Possível relação';
 const confirmacao = r => r.confirmada === true ? <Confirmacao rotulo="Relação confirmada" /> : null;
@@ -70,35 +71,31 @@ export default function ResultadoAnalise({ analiseSalva }) {
     <button type="button" disabled={salvando} onClick={() => { setEdicao({ indice: analise.relacoes.indexOf(r), relacao: r }); setMensagem(''); setFormSalvar(false); }}>Editar</button>
     <button type="button" disabled={salvando} onClick={() => removerRelacao(r)}>Remover</button>
   </div>;
-  const aoSalvar = resultado => {
+  const aoSalvar = () => {
     setSalvando(false);
     setFormSalvar(false);
     setMensagem('Análise salva com sucesso no EncilhaDB.');
-    navigate(`/analises_salvas/${resultado.id}`, { replace: true, state: {
-      analise: resultado.conteudo, salva: resultado, alterada: false,
+    navigate('/analises_salvas', { replace: true, state: {
       avisoSalvamento: 'Análise salva com sucesso no EncilhaDB.',
     } });
   };
   return <div className="container-analise">
-    <div className="topo-acao acoes-relacao"><Link to="/analisar_dados" className="btn-voltar">← Nova análise</Link><Link to="/analises_salvas" className="btn-acao">Análises salvas</Link></div>
+    <div className="topo-acao topo-resultado">
+      <Link to="/analises_salvas" className="btn-acao">Voltar</Link>
+      <p className="dica data-analise">Analisado em {new Date(analise.analisado_em).toLocaleString('pt-BR')}.</p>
+    </div>
     <h1>{salva?.nome || 'Análise de metadados'}</h1>
     {salva && <><p className="descricao-relacao">{salva.descricao}</p><p className="dica">Data de criação: {new Date(salva.data_criacao).toLocaleString('pt-BR')}.</p></>}
-    <div className="botoes"><button type="button" disabled={salvando || !!edicao} onClick={() => setFormSalvar(true)}>{salva ? 'Salvar alterações' : 'Salvar análise'}</button></div>
+    <div className="botoes"><button className="btn-aprovar" type="button" disabled={salvando || !!edicao} onClick={() => setFormSalvar(true)}>{salva ? 'Salvar alterações' : 'Salvar análise'}</button></div>
     <p className="dica">{salva ? state?.alterada ? 'Há alterações não salvas nesta análise.' : 'Análise salva no EncilhaDB.' : 'Esta análise ainda não foi salva.'}</p>
     {formSalvar && <SalvarAnaliseForm analise={analise} salva={salva} onSalva={aoSalvar} onOcupado={setSalvando} onCancelar={() => setFormSalvar(false)} />}
-    <div className="msg ok" role="status">Análise concluída com sucesso. {analise.tabelas.length} tabela(s) analisada(s).</div>
-    <p>{analise.conexao.nome} — {analise.conexao.database}</p>
-    <p className="dica">Schemas: {analise.schemas.join(', ')}. Analisado em {new Date(analise.analisado_em).toLocaleString('pt-BR')}.</p>
     <label className="opcao-selecao"><input type="checkbox" checked={mostrarSugestoes} onChange={e => setMostrarSugestoes(e.target.checked)} /> Mostrar possíveis relações</label>
     <p className="dica">Confirmadas: {analise.relacoes.filter(r => r.confirmada === true).length}. Possíveis: {analise.relacoes.filter(r => r.confirmada !== true).length}.</p>
-    <p className="dica">Linha contínua verde: relação confirmada. Linha tracejada: possível relação aguardando confirmação. Todas as relações começam sem confirmação, inclusive as detectadas no banco. As setas apontam para a tabela referenciada.</p>
-    <p className="dica">Editar ou remover relações atualiza esta análise. As chaves e tabelas do banco de dados permanecem preservadas.</p>
     {mensagem && <p className="msg ok" role="status">{mensagem}</p>}
     <div className="analise-layout">
       <section className="analise-painel" aria-label="Relações entre tabelas">
-        <h2>Relações entre tabelas ({relacoes.length})</h2>
+        <div className="cabecalho-grafo"><h2>Análise de relações em Grafo ({relacoes.length})</h2><InformacoesGrafo /></div>
         <GrafoRelacoes tabelas={analise.tabelas} relacoes={relacoes} onSelecionar={setSelecionada} selecionada={selecionada} />
-        <p className="dica">Clique em um círculo para destacar as tabelas conectadas e consultar todas as suas ligações e colunas. Clique novamente para voltar à rede completa.</p>
       </section>
       <aside className="analise-painel" aria-label="Tabelas sem relação">
         <h2>Tabelas sem relação ({isoladas.length})</h2>
@@ -107,14 +104,14 @@ export default function ResultadoAnalise({ analiseSalva }) {
       </aside>
     </div>
     {tabela && <section className="analise-painel" aria-label="Ligações da tabela selecionada">
-      <h2>Ligações de {tabela.schema}.{tabela.nome} ({ligacoesTabela.length})</h2>
-      <p className="dica">Relações de entrada e saída, incluindo possíveis relações quando o filtro está ativo.</p>
+      <h2>Relações entre tabelas ({ligacoesTabela.length})</h2>
+      <p className="dica">Tabela selecionada: {tabela.schema}.{tabela.nome}. Relações de entrada e saída, incluindo possíveis relações quando o filtro está ativo.</p>
       {ligacoesTabela.length ? <div className="tabela-rolagem"><table>
         <thead><tr><th>Tabela de origem</th><th>Colunas de origem</th><th>Tabela referenciada</th><th>Colunas referenciadas</th><th>Relação</th><th>Ações</th></tr></thead>
         <tbody>{ligacoesTabela.map((r, i) => <tr key={i}>
           <td><button type="button" onClick={() => setSelecionada(r.origem)}>{nomeTabela(r.origem)}</button></td><td>{r.colunas_origem.join(', ')}</td>
           <td><button type="button" onClick={() => setSelecionada(r.destino)}>{nomeTabela(r.destino)}</button></td><td>{r.colunas_destino.join(', ')}</td>
-          <td>{confirmacao(r)} {tipoRelacao(r)}<div className="titulo-relacao">{r.nome}</div></td>
+          <td>{confirmacao(r)} {tipoRelacao(r)}</td>
           <td>{acoes(r)}</td>
         </tr>)}</tbody>
       </table></div> : <p className="vazio">Nenhuma ligação encontrada para esta tabela com o filtro atual.</p>}
@@ -128,12 +125,6 @@ export default function ResultadoAnalise({ analiseSalva }) {
         <tbody>{tabela.colunas.map(c => <tr key={c.nome}><td>{c.nome}</td><td>{c.tipo}</td><td>{c.aceita_nulo ? 'Sim' : 'Não'}</td><td>{c.chave_primaria ? 'Sim' : 'Não'}</td></tr>)}</tbody>
       </table></div>
     </section>}
-    <details className="analise-painel"><summary>Detalhes das relações ({relacoes.length})</summary>
-      {relacoes.length ? <ul>{relacoes.map((r, i) => <li key={i}>
-        {confirmacao(r)} {nomeTabela(r.origem)} ({r.colunas_origem.join(', ')}) → {nomeTabela(r.destino)} ({r.colunas_destino.join(', ')}) — {tipoRelacao(r)}: {r.nome}
-        {acoes(r)}
-      </li>)}</ul> : <p className="vazio">Nenhuma relação encontrada.</p>}
-    </details>
     {analise.avisos.length > 0 && <section className="analise-painel"><h2>Referências fora da seleção</h2><ul>{analise.avisos.map((aviso, i) => <li key={i}>{aviso}</li>)}</ul></section>}
   </div>;
 }

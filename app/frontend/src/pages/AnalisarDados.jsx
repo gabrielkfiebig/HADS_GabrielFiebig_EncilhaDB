@@ -94,9 +94,14 @@ export default function AnalisarDados() {
 
   return (
     <div className="container-form analise-dados">
-      <div className="topo-acao"><Link to="/" className="btn-voltar">← Voltar</Link></div>
       <h1>Analisar dados</h1>
       <p className="dica">Selecione uma conexão, confirme os schemas e escolha as tabelas que deseja analisar.</p>
+      <ol className="etapas" aria-label="Etapas da análise">
+        {['Conexão', 'Schemas', 'Tabelas'].map((etapa, indice) => {
+          const atual = confirmados !== null ? 2 : schemas !== null ? 1 : 0;
+          return <li key={etapa} className={indice === atual ? 'etapa-atual' : indice < atual ? 'etapa-concluida' : ''} aria-current={indice === atual ? 'step' : undefined}><span>{indice < atual ? '✓' : indice + 1}</span>{etapa}</li>;
+        })}
+      </ol>
       {operacao === 'conexoes' ? <div className="msg" role="status">Carregando conexões...</div> : conexoes.length === 0 ? (
         <>
           {!erro && <p className="vazio">Nenhuma conexão disponível. <Link to="/cadastrar_conexoes">Cadastre uma conexão</Link> para continuar.</p>}
@@ -147,9 +152,11 @@ export default function AnalisarDados() {
               </section>;
             })}
             <p className="dica" role="status">{tabelasSelecionadas.length} tabela(s) selecionada(s).</p>
-            <div className="botoes"><button type="button" disabled={!tabelasSelecionadas.length} onClick={analisar}>Analisar dados</button></div>
             <p className="dica">A análise consulta os metadados das tabelas selecionadas para identificar relações.</p>
           </fieldset>}
+          {confirmados !== null && <div className="botoes acoes-analise">
+            <button className="btn-aprovar" type="button" disabled={!tabelasSelecionadas.length || !!operacao} onClick={analisar}>{operacao === 'analise' ? 'Analisando...' : 'Analisar dados'}</button>
+          </div>}
         </form>
       )}
       {operacao && operacao !== 'conexoes' && <div className="msg" role="status">{operacao === 'analise' ? 'Analisando metadados. Aguarde...' : operacao === 'schemas' ? 'Carregando schemas...' : 'Carregando tabelas...'}</div>}

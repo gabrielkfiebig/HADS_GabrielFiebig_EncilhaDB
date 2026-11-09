@@ -82,6 +82,7 @@ export default function ConexaoForm({ id }) {
     <div className="container-form">
       <div className="topo-acao"><Link to="/" className="btn-voltar">← Voltar</Link></div>
       <h1>{edicao ? 'Editar conexão' : 'Nova conexão'}</h1>
+      <p className="subtitulo">Configure sua fonte de dados para descobrir como suas tabelas se conectam.</p>
       {carregando ? <div className="msg" role="status">Carregando...</div> : falhaCarga ? (
         <div className="msg erro" role="alert">{msg.texto}</div>
       ) : (

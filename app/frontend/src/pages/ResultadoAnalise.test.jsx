@@ -17,9 +17,8 @@ const resultado = {
 };
 const abrir = analise => render(<MemoryRouter initialEntries={[{ pathname: '/analises', state: { analise } }]}><ResultadoAnalise /></MemoryRouter>);
 
-it('mostra confirmação de conclusão, grafo e tabelas isoladas ao lado', () => {
+it('mostra grafo e tabelas isoladas ao lado', () => {
   abrir(resultado);
-  expect(screen.getByRole('status').textContent).toContain('Análise concluída com sucesso');
   expect(screen.getByRole('img', { name: 'Grafo de relações entre tabelas' })).toBeDefined();
   const isoladas = screen.getByRole('complementary', { name: 'Tabelas sem relação' });
   expect(within(isoladas).getByRole('button', { name: 'public.logs' })).toBeDefined();
@@ -65,7 +64,7 @@ it('destaca a vizinhança e lista todas as ligações da tabela clicada', () => 
   expect(clientes.getAttribute('opacity')).toBe('1');
   expect(document.querySelectorAll('.grafo-ligacao[data-destaque="true"]')).toHaveLength(2);
   expect(document.querySelectorAll('.grafo-ligacao[data-destaque="false"]')).toHaveLength(1);
-  fireEvent.click(screen.getByRole('button', { name: 'Mostrar toda a rede' }));
+  fireEvent.click(pedidos);
   expect(screen.queryByRole('region', { name: 'Ligações da tabela selecionada' })).toBeNull();
   expect(logs.getAttribute('opacity')).toBe('1');
 });
@@ -76,11 +75,11 @@ it('permite navegar pelas ligações e desfazer a seleção clicando novamente n
   let painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
   fireEvent.click(within(painel).getByRole('button', { name: 'public.pedidos' }));
   painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
-  expect(within(painel).getByText('Ligações de public.pedidos (2)')).toBeDefined();
+  expect(within(painel).getByText('Relações entre tabelas (2)')).toBeDefined();
   const linha = within(painel).getAllByRole('row')[1];
   fireEvent.click(within(linha).getByRole('button', { name: 'Confirmar relação' }));
   fireEvent.click(screen.getByLabelText('Mostrar possíveis relações'));
-  expect(within(painel).getByText('Ligações de public.pedidos (1)')).toBeDefined();
+  expect(within(painel).getByText('Relações entre tabelas (1)')).toBeDefined();
   fireEvent.click(screen.getByRole('button', { name: 'Ver metadados de public.pedidos' }));
   expect(screen.queryByRole('region', { name: 'Ligações da tabela selecionada' })).toBeNull();
 });
@@ -140,13 +139,13 @@ it('edita a tabela relacionada e atualiza grafo, isoladas e detalhes', async () 
   const isoladas = screen.getByRole('complementary', { name: 'Tabelas sem relação' });
   expect(within(isoladas).getByRole('button', { name: 'public.clientes' })).toBeDefined();
   expect(within(isoladas).queryByRole('button', { name: 'public.logs' })).toBeNull();
-  expect(screen.getByText('Ligações de public.clientes (0)')).toBeDefined();
+  expect(screen.getByText('Relações entre tabelas (0)')).toBeDefined();
   expect(document.querySelector('.grafo-ligacao[stroke-dasharray="5 4"]')).not.toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Ver metadados de public.logs' }));
   fireEvent.click(within(screen.getByRole('region', { name: 'Ligações da tabela selecionada' })).getByRole('button', { name: 'Confirmar relação' }));
   fireEvent.click(screen.getByLabelText('Mostrar possíveis relações'));
   expect(screen.getByRole('button', { name: 'Ver metadados de public.logs' })).toBeDefined();
-  expect(screen.getByText('Relações entre tabelas (1)')).toBeDefined();
+  expect(screen.getByText('Análise de relações em Grafo (1)')).toBeDefined();
   expect(resultado.relacoes[0].destino).toBe('a');
 });
 
@@ -184,14 +183,13 @@ it('confirma a remoção e atualiza todos os contadores e a lista de isoladas', 
   selecionarCliente();
   const painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
   fireEvent.click(within(painel).getByRole('button', { name: 'Remover' }));
-  expect(screen.getByText('Relações entre tabelas (2)')).toBeDefined();
+  expect(screen.getByText('Análise de relações em Grafo (2)')).toBeDefined();
   confirm.mockReturnValue(true);
   fireEvent.click(within(painel).getByRole('button', { name: 'Remover' }));
   await screen.findByText('Relação removida da análise.');
-  expect(screen.getByText('Relações entre tabelas (1)')).toBeDefined();
-  expect(screen.getByText('Detalhes das relações (1)')).toBeDefined();
+  expect(screen.getByText('Análise de relações em Grafo (1)')).toBeDefined();
   expect(screen.getByText('Tabelas sem relação (2)')).toBeDefined();
-  expect(screen.getByText('Ligações de public.clientes (0)')).toBeDefined();
+  expect(screen.getByText('Relações entre tabelas (0)')).toBeDefined();
   expect(document.querySelectorAll('.grafo-ligacao')).toHaveLength(1);
 });
 
@@ -204,7 +202,7 @@ it('impede duplicar uma relação existente', async () => {
   fireEvent.change(within(editor).getByLabelText('Coluna da tabela relacionada 1'), { target: { value: 'id' } });
   fireEvent.click(within(editor).getByRole('button', { name: 'Salvar relação' }));
   expect((await screen.findByRole('alert')).textContent).toContain('Já existe uma relação');
-  expect(screen.getByText('Relações entre tabelas (2)')).toBeDefined();
+  expect(screen.getByText('Análise de relações em Grafo (2)')).toBeDefined();
 });
 
 it('preserva edições na navegação para permitir recarregar o resultado', async () => {
@@ -232,7 +230,7 @@ it('salva uma relação composta preservando a correspondência dos pares', asyn
   const painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
   expect(within(painel).getByText('cliente_id, id')).toBeDefined();
   expect(within(painel).getByText('id, codigo')).toBeDefined();
-  expect(screen.getByText('Ligações de public.clientes (1)')).toBeDefined();
+  expect(screen.getByText('Relações entre tabelas (1)')).toBeDefined();
   expect(document.querySelector('.grafo-ligacao title').textContent).toContain('id, codigo');
 });
 
@@ -242,7 +240,7 @@ it('move todas as tabelas para a lista lateral ao remover a última relação', 
   selecionarCliente();
   fireEvent.click(within(screen.getByRole('region', { name: 'Ligações da tabela selecionada' })).getByRole('button', { name: 'Remover' }));
   await screen.findByText('Relação removida da análise.');
-  expect(screen.getByText('Relações entre tabelas (0)')).toBeDefined();
+  expect(screen.getByText('Análise de relações em Grafo (0)')).toBeDefined();
   expect(screen.getByText('Tabelas sem relação (4)')).toBeDefined();
   expect(screen.getByText('Nenhuma relação encontrada entre as tabelas selecionadas.')).toBeDefined();
 });
@@ -261,7 +259,7 @@ it('começa sem confirmações e permite confirmar, editar e remover uma relaç�
   expect(within(painel).queryByRole('button', { name: 'Confirmar relação' })).toBeNull();
   expect(within(painel).getByRole('button', { name: 'Editar' })).toBeDefined();
   expect(within(painel).getByRole('button', { name: 'Remover' })).toBeDefined();
-  expect(document.querySelector('.grafo-ligacao[stroke="#0a7a2f"]')).not.toBeNull();
+  expect(document.querySelector('.grafo-ligacao[stroke="#91d9aa"]')).not.toBeNull();
   fireEvent.click(screen.getByLabelText('Mostrar possíveis relações'));
   expect(document.querySelectorAll('.grafo-ligacao')).toHaveLength(1);
   fireEvent.click(within(painel).getByRole('button', { name: 'Remover' }));
@@ -286,7 +284,7 @@ it('cria relação pelo + sem título e descrição e integra ao fluxo de confir
   expect(document.querySelectorAll('.grafo-ligacao')).toHaveLength(3);
   expect(screen.getByText('Confirmadas: 0. Possíveis: 3.')).toBeDefined();
   const painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
-  expect(within(painel).getByText('Relação criada na análise')).toBeDefined();
+  expect(within(painel).getByText('Possível relação')).toBeDefined();
   fireEvent.click(within(painel).getByRole('button', { name: 'Confirmar relação' }));
   expect(within(painel).getByRole('img', { name: 'Relação confirmada' })).toBeDefined();
   fireEvent.click(within(painel).getByRole('button', { name: 'Editar' }));
@@ -295,7 +293,7 @@ it('cria relação pelo + sem título e descrição e integra ao fluxo de confir
   await screen.findByText('Relação atualizada na análise. Confirme novamente após revisar.');
   expect(within(painel).queryByRole('img', { name: 'Relação confirmada' })).toBeNull();
   expect(within(painel).getByRole('button', { name: 'Confirmar relação' })).toBeDefined();
-  expect(within(painel).getByText('Relação editada na análise')).toBeDefined();
+  expect(within(painel).queryByText('Relação editada na análise')).toBeNull();
 });
 
 it('tabelas isoladas não alteram a disposição, cores ou destaque do grafo', () => {
@@ -348,5 +346,5 @@ it('mantém confirmação na navegação do resultado', async () => {
   selecionarCliente();
   const painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
   expect(within(painel).getByRole('img', { name: 'Relação confirmada' })).toBeDefined();
-  expect(within(painel).getByText('Relação editada na análise')).toBeDefined();
+  expect(within(painel).queryByText('Relação editada na análise')).toBeNull();
 });

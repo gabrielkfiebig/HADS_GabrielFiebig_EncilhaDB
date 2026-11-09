@@ -309,6 +309,26 @@ class ApiTests(unittest.TestCase):
         _, second = self.request("POST", "/analises", {**payload, "nome": "Outra análise"})
         self.assertEqual([a["id"] for a in self.request("GET", "/analises")[1]["analises"]], [second["id"], first["id"]])
 
+    def test_delete_analysis_preserves_other_analyses_and_source_connection(self):
+        payload = self.analysis_payload()
+        _, first = self.request("POST", "/analises", payload)
+        _, second = self.request("POST", "/analises", {**payload, "nome": "Outra análise"})
+        self.assertEqual(self.request("DELETE", f'/analises/{first["id"]}')[0], 200)
+        self.assertEqual(self.request("GET", f'/analises/{first["id"]}')[0], 404)
+        self.assertEqual(self.request("DELETE", f'/analises/{first["id"]}')[0], 404)
+        self.assertEqual(self.request("GET", f'/analises/{second["id"]}')[0], 200)
+        self.assertEqual(self.request("GET", f'/conexoes/{payload["conexao_id"]}')[0], 200)
+        self.assertEqual(len(self.request("GET", "/analises")[1]["analises"]), 1)
+
+    def test_delete_analysis_rolls_back_when_commit_fails(self):
+        payload = self.analysis_payload()
+        _, saved = self.request("POST", "/analises", payload)
+        with patch.object(self.session, "commit", side_effect=OperationalError("secret", {}, Exception("secret"))):
+            status, body = self.request("DELETE", f'/analises/{saved["id"]}')
+        self.assertEqual(status, 503)
+        self.assertNotIn("secret", json.dumps(body))
+        self.assertEqual(self.request("GET", f'/analises/{saved["id"]}')[0], 200)
+
     def test_initialization_adds_analysis_table_without_altering_existing_tables(self):
         inspector = MagicMock()
         inspector.has_table.return_value = True

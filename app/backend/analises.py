@@ -16,6 +16,17 @@ def listar(db):
     return db.query(Analise).order_by(Analise.data_criacao.desc(), Analise.id.desc()).all()
 
 
+def excluir(id, db):
+    registro = buscar(id, db)
+    try:
+        db.delete(registro)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(503, "Não foi possível remover a análise. Tente novamente.") from None
+    return {"mensagem": "Análise removida com sucesso."}
+
+
 def salvar(dados, db, id=None):
     if id is None:
         origem = conexao.buscar_conexao(dados.conexao_id, db)

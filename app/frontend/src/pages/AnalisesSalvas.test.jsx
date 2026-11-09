@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import ListarAnalises from './ListarAnalises.jsx';
@@ -7,8 +7,8 @@ import AbrirAnalise from './AbrirAnalise.jsx';
 import ResultadoAnalise from './ResultadoAnalise.jsx';
 import * as api from '../services/api.js';
 
-vi.mock('../services/api.js', () => ({ listarAnalises: vi.fn(), buscarAnalise: vi.fn(), salvarAnalise: vi.fn() }));
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+vi.mock('../services/api.js', () => ({ listarAnalises: vi.fn(), buscarAnalise: vi.fn(), salvarAnalise: vi.fn(), excluirAnalise: vi.fn() }));
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 const snapshot = {
   conexao: { id: 1, nome: 'Conexão comercial', database: 'loja' }, analisado_em: '2026-11-08T12:00:00Z', schemas: ['public'], avisos: [], sem_relacao: [],
   tabelas: ['clientes', 'pedidos'].map(id => ({ id, nome: id, schema: 'public', colunas: [{ nome: 'id', tipo: 'INTEGER', aceita_nulo: false, chave_primaria: true }], chaves_unicas: [['id']] })),
@@ -66,7 +66,7 @@ it('lista análises com nome, descrição, database, data e link para reabrir', 
   expect(api.buscarAnalise).toHaveBeenCalledWith('7');
 });
 
-it('salva o estado completo com nome e descrição e database não editável', async () => {
+it('salva o estado completo e direciona para a lista de análises salvas', async () => {
   abrir('/analises', { analise: snapshot });
   fireEvent.click(screen.getByRole('button', { name: 'Salvar análise' }));
   const form = screen.getByRole('region', { name: 'Salvar análise' });
@@ -75,7 +75,10 @@ it('salva o estado completo com nome e descrição e database não editável', a
   fireEvent.change(within(form).getByLabelText('Nome da análise'), { target: { value: 'Mapa comercial' } });
   fireEvent.change(within(form).getByLabelText('Descrição da análise'), { target: { value: 'Análise revisada' } });
   fireEvent.click(within(form).getByRole('button', { name: 'Confirmar salvamento' }));
-  await screen.findByRole('heading', { name: 'Mapa comercial' });
+  await screen.findByRole('heading', { name: 'Análises salvas' });
+  await screen.findByRole('link', { name: 'Abrir análise' });
+  expect(api.listarAnalises).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('region', { name: 'Salvar análise' })).toBeNull();
   const [dados, id] = api.salvarAnalise.mock.calls[0];
   expect(id).toBeUndefined();
   expect(dados).toMatchObject({ nome: 'Mapa comercial', descricao: 'Análise revisada', conexao_id: 1, database_origem: 'loja' });
@@ -91,7 +94,7 @@ it('reabre pelo endereço sem estado de navegação e restaura o grafo e confirm
   fireEvent.click(screen.getByRole('button', { name: 'Ver metadados de public.clientes' }));
   const painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
   expect(within(painel).getByRole('img', { name: 'Relação confirmada' })).toBeDefined();
-  expect(within(painel).getByText('manual')).toBeDefined();
+  expect(within(painel).getByRole('cell', { name: 'Relação confirmada Relação' })).toBeDefined();
   expect(within(painel).queryByText('Relação revisada.')).toBeNull();
 });
 
@@ -112,11 +115,11 @@ it('salva alterações permitindo editar a descrição e mantendo nome, id e dat
   fireEvent.change(within(form).getByLabelText('Descrição da análise'), { target: { value: 'Descrição atualizada' } });
   fireEvent.click(within(form).getByRole('button', { name: 'Salvar alterações' }));
   await screen.findByText('Análise salva com sucesso no EncilhaDB.');
-  expect(screen.getByRole('heading', { name: 'Mapa comercial' })).toBeDefined();
+  expect(screen.getByRole('heading', { name: 'Análises salvas' })).toBeDefined();
   expect(api.salvarAnalise.mock.calls[0][1]).toBe(7);
   expect(api.salvarAnalise.mock.calls[0][0]).toMatchObject({ nome: 'Mapa comercial', descricao: 'Descrição atualizada' });
   expect(api.salvarAnalise.mock.calls[0][0].snapshot.relacoes[0]).toMatchObject({ confirmada: false, nome: 'Relação editada na análise' });
-  expect(screen.getByText(`Data de criação: ${new Date(registro.data_criacao).toLocaleString('pt-BR')}.`)).toBeDefined();
+  await screen.findByText(new Date(registro.data_criacao).toLocaleString('pt-BR'));
 });
 
 it('preserva campos em erro e bloqueia salvamentos duplicados', async () => {
@@ -132,7 +135,7 @@ it('preserva campos em erro e bloqueia salvamentos duplicados', async () => {
   expect(api.salvarAnalise).toHaveBeenCalledTimes(1);
   expect(within(form).getByLabelText('Nome da análise').value).toBe('Mapa comercial');
   fireEvent.click(salvar);
-  await screen.findByRole('heading', { name: 'Mapa comercial' });
+  await screen.findByRole('heading', { name: 'Análises salvas' });
 });
 
 it('trata lista vazia e permite repetir uma falha de carregamento', async () => {
@@ -150,4 +153,47 @@ it('informa análise inexistente e oferece voltar ou tentar novamente', async ()
   expect(screen.getByRole('link', { name: '← Análises salvas' })).toBeDefined();
   fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
   await screen.findByRole('heading', { name: 'Mapa comercial' });
+});
+
+it('oculta o aviso de salvamento após três segundos', async () => {
+  vi.useFakeTimers();
+  await act(async () => { abrir('/analises_salvas', { avisoSalvamento: 'Análise salva com sucesso no EncilhaDB.' }); });
+  expect(screen.getByText('Análise salva com sucesso no EncilhaDB.')).toBeDefined();
+  act(() => vi.advanceTimersByTime(2999));
+  expect(screen.getByText('Análise salva com sucesso no EncilhaDB.')).toBeDefined();
+  act(() => vi.advanceTimersByTime(1));
+  expect(screen.queryByText('Análise salva com sucesso no EncilhaDB.')).toBeNull();
+  expect(screen.getByText('Mapa comercial')).toBeDefined();
+});
+
+it('confirma a remoção, bloqueia duplicações e atualiza a lista após sucesso', async () => {
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  let concluir;
+  api.excluirAnalise.mockImplementation(() => new Promise(resolve => { concluir = resolve; }));
+  abrir('/analises_salvas');
+  const remover = await screen.findByRole('button', { name: 'Remover' });
+  fireEvent.click(remover);
+  expect(api.excluirAnalise).not.toHaveBeenCalled();
+  confirm.mockReturnValue(true);
+  fireEvent.click(remover);
+  expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('Mapa comercial'));
+  expect(screen.getByRole('button', { name: 'Removendo...' }).disabled).toBe(true);
+  fireEvent.click(remover);
+  expect(api.excluirAnalise).toHaveBeenCalledTimes(1);
+  expect(api.excluirAnalise).toHaveBeenCalledWith(7);
+  expect(screen.getByText('Mapa comercial')).toBeDefined();
+  await act(async () => concluir({ mensagem: 'Análise removida com sucesso.' }));
+  expect(screen.queryByText('Mapa comercial')).toBeNull();
+  expect(screen.getByText('Nenhuma análise salva até o momento.')).toBeDefined();
+});
+
+it('mantém a análise na lista quando a remoção falha e permite repetir', async () => {
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  api.excluirAnalise.mockRejectedValueOnce(new Error('Não foi possível remover.')).mockResolvedValue({ mensagem: 'Removida.' });
+  abrir('/analises_salvas');
+  fireEvent.click(await screen.findByRole('button', { name: 'Remover' }));
+  expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível remover.');
+  expect(screen.getByText('Mapa comercial')).toBeDefined();
+  fireEvent.click(screen.getByRole('button', { name: 'Remover' }));
+  await screen.findByText('Nenhuma análise salva até o momento.');
 });

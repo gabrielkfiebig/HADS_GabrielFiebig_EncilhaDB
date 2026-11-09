@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { montarGrafo } from '../services/graphLayout.js';
 
-const cores = ['#5689b5', '#bb7251', '#65a171', '#9772b5', '#c19a49', '#54a1a7'];
+const cores = ['#c084fc', '#ff9f1c', '#ff70db', '#e0aaff', '#ffbf80', '#f2a2dc'];
 
 function escalaDaVisao(svg, grafo, camera) {
   const rect = svg.getBoundingClientRect();
@@ -86,9 +86,7 @@ export default function GrafoRelacoes({ tabelas, relacoes, onSelecionar, selecio
   }
   if (!grafo.nos.length) return <p className="vazio">Nenhuma relação encontrada entre as tabelas selecionadas.</p>;
   return <>
-    {selecaoNoGrafo && <div className="botoes grafo-controles"><button type="button" onClick={() => onSelecionar(null)}>Mostrar toda a rede</button></div>}
-    <p className="dica">Quanto mais relações, maior o círculo. As cores identificam os schemas.</p>
-    <p className="dica" id={`${marcador}-ajuda`}>Segure e arraste para mover a visão. Use Ctrl + rolagem do mouse para ampliar ou reduzir.</p>
+    <p className="somente-leitor" id={`${marcador}-ajuda`}>Segure e arraste para mover a visão. Use Ctrl + rolagem do mouse para ampliar ou reduzir. Clique em um círculo para selecionar ou desfazer a seleção.</p>
     <div className="grafo-legenda">{schemas.map((schema, i) => <span key={schema}><i style={{ background: cores[i % cores.length] }} />{schema}</span>)}</div>
     <div className={`grafo-area${arrastando ? ' arrastando' : ''}`} aria-label="Área de navegação do grafo">
       <svg ref={svgRef} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" tabIndex={0} aria-describedby={`${marcador}-ajuda`}
@@ -114,7 +112,7 @@ export default function GrafoRelacoes({ tabelas, relacoes, onSelecionar, selecio
             const entrada = Math.max(1, Math.hypot(b.x - cx, b.y - cy));
             caminho = `M ${a.x + (cx - a.x) / saida * a.raio} ${a.y + (cy - a.y) / saida * a.raio} Q ${cx} ${cy} ${b.x - (b.x - cx) / entrada * (b.raio + 3)} ${b.y - (b.y - cy) / entrada * (b.raio + 3)}`;
           }
-          return <path key={r.indice} className="grafo-ligacao" data-destaque={ativa} d={caminho} fill="none" stroke={r.confirmada === true ? '#0a7a2f' : selecaoNoGrafo && ativa ? '#2e567c' : '#999'} strokeOpacity={ativa ? 0.8 : 0.1} strokeWidth={selecaoNoGrafo && ativa ? 2 : 1} strokeDasharray={r.confirmada === true ? undefined : '5 4'} markerEnd={`url(#${marcador})`}>
+          return <path key={r.indice} className="grafo-ligacao" data-destaque={ativa} d={caminho} fill="none" stroke={r.confirmada === true ? '#91d9aa' : selecaoNoGrafo && ativa ? '#ffbe0b' : '#aaa9a1'} strokeOpacity={ativa ? 0.8 : 0.1} strokeWidth={selecaoNoGrafo && ativa ? 2 : 1} strokeDasharray={r.confirmada === true ? undefined : '5 4'} markerEnd={`url(#${marcador})`}>
             <title>{a.schema}.{a.nome} ({r.colunas_origem.join(', ')}) → {b.schema}.{b.nome} ({r.colunas_destino.join(', ')}) — {r.nome} ({r.confirmada === true ? 'Relação confirmada' : 'Possível relação'})</title>
           </path>;
         })}
@@ -123,9 +121,9 @@ export default function GrafoRelacoes({ tabelas, relacoes, onSelecionar, selecio
           const acionar = () => onSelecionar(t.id === selecionada ? null : t.id);
           return <g key={t.id} transform={`translate(${t.x}, ${t.y})`} opacity={!selecaoNoGrafo || relacionadas.has(t.id) ? 1 : 0.18} role="button" tabIndex={0} aria-label={`Ver metadados de ${t.schema}.${t.nome}`} aria-pressed={selecionada === t.id} onClick={acionar} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); acionar(); } }} className="grafo-no">
             <title>{t.schema}.{t.nome} — {t.grau} relação(ões)</title>
-            <circle r={t.raio} fill={cor} fillOpacity="0.85" stroke={selecionada === t.id ? '#222' : cor} strokeWidth={selecionada === t.id ? 3 : 1} />
-            <text textAnchor="middle" y="4" fontSize="12" fill="#fff" fontWeight="600">{t.grau}</text>
-            <text className="grafo-rotulo" textAnchor="middle" y={t.raio + 17} fontSize="12" fill="#222">{t.nome.length > 24 ? `${t.nome.slice(0, 21)}…` : t.nome}</text>
+            <circle r={t.raio} fill={cor} fillOpacity="0.95" stroke={selecionada === t.id ? '#fff4cc' : cor} strokeWidth={selecionada === t.id ? 3 : 1} />
+            <text textAnchor="middle" y="4" fontSize="12" fill="#101010" fontWeight="700">{t.grau}</text>
+            <text className="grafo-rotulo" textAnchor="middle" y={t.raio + 17} fontSize="12" fill="#edede6">{t.nome.length > 24 ? `${t.nome.slice(0, 21)}…` : t.nome}</text>
           </g>;
         })}
       </svg>
