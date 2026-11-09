@@ -86,6 +86,37 @@ it('permite navegar pelas ligações e desfazer a seleção clicando novamente n
 });
 
 const selecionarCliente = () => fireEvent.click(screen.getByRole('button', { name: 'Ver metadados de public.clientes' }));
+
+it('aprova a descrição, preserva respostas por tabela e exige nova aprovação após editar', () => {
+  abrir(resultado);
+  selecionarCliente();
+  const descricao = screen.getByRole('region', { name: 'Descrição da tabela' });
+  const aprovar = within(descricao).getByRole('button', { name: 'Aprovar descrição de tabela' });
+  expect(aprovar.disabled).toBe(true);
+  const svg = screen.getByRole('img', { name: 'Grafo de relações entre tabelas' });
+  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 800, height: 600 });
+  fireEvent.wheel(svg, { ctrlKey: true, deltaY: -100, clientX: 200, clientY: 200 });
+  const visao = svg.getAttribute('viewBox');
+  fireEvent.change(within(descricao).getByLabelText('O que esta tabela representa no sistema de origem?'), { target: { value: 'Cada registro representa um cliente.' } });
+  fireEvent.click(within(descricao).getByLabelText('Cadastro'));
+  expect(svg.getAttribute('viewBox')).toBe(visao);
+  expect(aprovar.disabled).toBe(false);
+  fireEvent.click(aprovar);
+  expect(within(descricao).getByRole('img', { name: 'Descrição de tabela aprovada' }).className).toBe('relacao-confirmada');
+  fireEvent.click(screen.getByRole('button', { name: 'Ver metadados de public.pedidos' }));
+  expect(within(descricao).getByLabelText('O que esta tabela representa no sistema de origem?').value).toBe('');
+  selecionarCliente();
+  expect(within(descricao).getByLabelText('O que esta tabela representa no sistema de origem?').value).toContain('um cliente');
+  expect(within(descricao).getByRole('img', { name: 'Descrição de tabela aprovada' })).toBeDefined();
+  fireEvent.change(within(descricao).getByLabelText('Existem regras ou particularidades importantes?'), { target: { value: 'Clientes ativos e inativos.' } });
+  expect(within(descricao).queryByRole('img', { name: 'Descrição de tabela aprovada' })).toBeNull();
+  fireEvent.click(within(descricao).getByLabelText('Outro / Não sei (Descreva)'));
+  expect(within(descricao).getByRole('button', { name: 'Aprovar descrição de tabela' }).disabled).toBe(true);
+  fireEvent.change(within(descricao).getByLabelText('Descreva o tipo da tabela'), { target: { value: 'Tabela mista.' } });
+  fireEvent.click(within(descricao).getByRole('button', { name: 'Aprovar descrição de tabela' }));
+  expect(within(descricao).getByRole('img', { name: 'Descrição de tabela aprovada' })).toBeDefined();
+});
+
 const abrirEditor = () => {
   selecionarCliente();
   fireEvent.click(within(screen.getByRole('region', { name: 'Ligações da tabela selecionada' })).getByRole('button', { name: 'Editar' }));
@@ -238,13 +269,13 @@ it('começa sem confirmações e permite confirmar, editar e remover uma relaç�
   expect(screen.getByText('Confirmadas: 0. Possíveis: 1.')).toBeDefined();
 });
 
-it('cria relação pelo + com título e descrição e integra ao fluxo de confirmação', async () => {
+it('cria relação pelo + sem título e descrição e integra ao fluxo de confirmação', async () => {
   abrir(resultado);
   fireEvent.click(screen.getByRole('button', { name: 'Criar relação para public.logs' }));
   let editor = screen.getByRole('region', { name: 'Criar relação' });
   expect(within(editor).getByLabelText('Tabela principal (origem)').value).toBe('c');
-  fireEvent.change(within(editor).getByLabelText('Título da relação'), { target: { value: 'Logs do pedido' } });
-  fireEvent.change(within(editor).getByLabelText('Descrição da relação'), { target: { value: 'Histórico de eventos\nassociados ao pedido.' } });
+  expect(within(editor).queryByLabelText('Título da relação')).toBeNull();
+  expect(within(editor).queryByLabelText('Descrição da relação')).toBeNull();
   fireEvent.change(within(editor).getByLabelText('Tabela relacionada (referenciada)'), { target: { value: 'b' } });
   fireEvent.change(within(editor).getByLabelText('Coluna da tabela principal 1'), { target: { value: 'id' } });
   fireEvent.change(within(editor).getByLabelText('Coluna da tabela relacionada 1'), { target: { value: 'id' } });
@@ -255,21 +286,16 @@ it('cria relação pelo + com título e descrição e integra ao fluxo de confir
   expect(document.querySelectorAll('.grafo-ligacao')).toHaveLength(3);
   expect(screen.getByText('Confirmadas: 0. Possíveis: 3.')).toBeDefined();
   const painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
-  expect(within(painel).getByText('Logs do pedido')).toBeDefined();
-  expect(within(painel).getByText(/Histórico de eventos/).textContent).toContain('\n');
-  expect([...document.querySelectorAll('.grafo-ligacao title')].some(t => t.textContent.includes('Logs do pedido') && t.textContent.includes('Histórico de eventos'))).toBe(true);
+  expect(within(painel).getByText('Relação criada na análise')).toBeDefined();
   fireEvent.click(within(painel).getByRole('button', { name: 'Confirmar relação' }));
   expect(within(painel).getByRole('img', { name: 'Relação confirmada' })).toBeDefined();
   fireEvent.click(within(painel).getByRole('button', { name: 'Editar' }));
   editor = screen.getByRole('region', { name: 'Editar relação' });
-  expect(within(editor).getByLabelText('Título da relação').value).toBe('Logs do pedido');
-  expect(within(editor).getByLabelText('Descrição da relação').value).toContain('Histórico');
-  fireEvent.change(within(editor).getByLabelText('Título da relação'), { target: { value: 'Logs revisados' } });
   fireEvent.click(within(editor).getByRole('button', { name: 'Salvar relação' }));
   await screen.findByText('Relação atualizada na análise. Confirme novamente após revisar.');
   expect(within(painel).queryByRole('img', { name: 'Relação confirmada' })).toBeNull();
   expect(within(painel).getByRole('button', { name: 'Confirmar relação' })).toBeDefined();
-  expect(within(painel).getByText('Logs revisados')).toBeDefined();
+  expect(within(painel).getByText('Relação editada na análise')).toBeDefined();
 });
 
 it('tabelas isoladas não alteram a disposição, cores ou destaque do grafo', () => {
@@ -308,21 +334,19 @@ it('cancelar criação preserva a tabela isolada e as relações existentes', ()
   expect(document.querySelectorAll('.grafo-ligacao')).toHaveLength(2);
 });
 
-it('mantém confirmação, título e descrição na navegação do resultado', async () => {
+it('mantém confirmação na navegação do resultado', async () => {
   function Estado() { return <output data-testid="estado">{JSON.stringify(useLocation().state)}</output>; }
   render(<MemoryRouter initialEntries={[{ pathname: '/analises', state: { analise: resultado } }]}><ResultadoAnalise /><Estado /></MemoryRouter>);
   const editor = abrirEditor();
-  fireEvent.change(within(editor).getByLabelText('Título da relação'), { target: { value: 'Pedidos por cliente' } });
-  fireEvent.change(within(editor).getByLabelText('Descrição da relação'), { target: { value: 'Cada pedido pertence a um cliente.' } });
   fireEvent.click(within(editor).getByRole('button', { name: 'Salvar relação' }));
   await screen.findByText('Relação atualizada na análise. Confirme novamente após revisar.');
   fireEvent.click(within(screen.getByRole('region', { name: 'Ligações da tabela selecionada' })).getByRole('button', { name: 'Confirmar relação' }));
   const salvo = JSON.parse(screen.getByTestId('estado').textContent);
-  expect(salvo.analise.relacoes[0]).toMatchObject({ confirmada: true, titulo: 'Pedidos por cliente', descricao: 'Cada pedido pertence a um cliente.' });
+  expect(salvo.analise.relacoes[0]).toMatchObject({ confirmada: true, tipo: 'manual' });
   cleanup();
   abrir(salvo.analise);
   selecionarCliente();
   const painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
   expect(within(painel).getByRole('img', { name: 'Relação confirmada' })).toBeDefined();
-  expect(within(painel).getByText('Pedidos por cliente')).toBeDefined();
+  expect(within(painel).getByText('Relação editada na análise')).toBeDefined();
 });

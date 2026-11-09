@@ -18,7 +18,10 @@ export default function GrafoRelacoes({ tabelas, relacoes, onSelecionar, selecio
   const svgRef = useRef(null);
   const arraste = useRef(null);
   const ignorarClique = useRef(false);
-  const grafo = useMemo(() => montarGrafo(tabelas, relacoes), [tabelas, relacoes]);
+  // Describing a table must preserve the graph's layout and camera.
+  const chaveTabelas = JSON.stringify(tabelas.map(({ id, schema, nome }) => ({ id, schema, nome })));
+  const tabelasGrafo = useMemo(() => JSON.parse(chaveTabelas), [chaveTabelas]);
+  const grafo = useMemo(() => montarGrafo(tabelasGrafo, relacoes), [tabelasGrafo, relacoes]);
   useEffect(() => {
     setCamera({ x: 0, y: 0, zoom: 1 });
     setArrastando(false);
@@ -112,7 +115,7 @@ export default function GrafoRelacoes({ tabelas, relacoes, onSelecionar, selecio
             caminho = `M ${a.x + (cx - a.x) / saida * a.raio} ${a.y + (cy - a.y) / saida * a.raio} Q ${cx} ${cy} ${b.x - (b.x - cx) / entrada * (b.raio + 3)} ${b.y - (b.y - cy) / entrada * (b.raio + 3)}`;
           }
           return <path key={r.indice} className="grafo-ligacao" data-destaque={ativa} d={caminho} fill="none" stroke={r.confirmada === true ? '#0a7a2f' : selecaoNoGrafo && ativa ? '#2e567c' : '#999'} strokeOpacity={ativa ? 0.8 : 0.1} strokeWidth={selecaoNoGrafo && ativa ? 2 : 1} strokeDasharray={r.confirmada === true ? undefined : '5 4'} markerEnd={`url(#${marcador})`}>
-            <title>{a.schema}.{a.nome} ({r.colunas_origem.join(', ')}) → {b.schema}.{b.nome} ({r.colunas_destino.join(', ')}) — {r.titulo || r.nome} ({r.confirmada === true ? 'Relação confirmada' : 'Possível relação'}){r.descricao ? ` — ${r.descricao}` : ''}</title>
+            <title>{a.schema}.{a.nome} ({r.colunas_origem.join(', ')}) → {b.schema}.{b.nome} ({r.colunas_destino.join(', ')}) — {r.nome} ({r.confirmada === true ? 'Relação confirmada' : 'Possível relação'})</title>
           </path>;
         })}
         {grafo.nos.map(t => {

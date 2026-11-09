@@ -108,6 +108,18 @@ class TabelaSnapshot(TabelaSelecionada):
     id: str = Field(min_length=1, max_length=1000)
     colunas: list[ColunaSnapshot] = Field(max_length=2000)
     chaves_unicas: list[list[Identificador]] = Field(default_factory=list, max_length=2000)
+    descricao: str = Field(default="", max_length=2000)
+    regras: str = Field(default="", max_length=2000)
+    tipo_principal: Literal["", "Cadastro", "Transações/eventos", "Histórico", "Complemento de outra tabela", "Outro / Não sei"] = ""
+    tipo_descricao: str = Field(default="", max_length=1000)
+    descricao_aprovada: bool = False
+
+    @model_validator(mode="after")
+    def validar_descricao_aprovada(self):
+        if self.descricao_aprovada and (not self.descricao.strip() or not self.tipo_principal or
+                (self.tipo_principal == "Outro / Não sei" and not self.tipo_descricao.strip())):
+            raise ValueError("Preencha a finalidade e o tipo da tabela antes de aprovar a descrição.")
+        return self
 
 
 class RelacaoSnapshot(BaseModel):

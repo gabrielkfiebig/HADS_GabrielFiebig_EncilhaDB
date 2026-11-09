@@ -205,6 +205,25 @@ class ApiTests(unittest.TestCase):
                     "relacoes": [{"origem": "pedidos", "destino": "clientes", "colunas_origem": ["cliente_id"], "colunas_destino": ["id"],
                                   "nome": "Relação criada na análise", "tipo": "manual", "confirmada": True, "titulo": "Pedidos do cliente", "descricao": "Revisada pelo usuário"}]}}
 
+    def test_saved_table_description_round_trip_and_validation(self):
+        payload = self.analysis_payload()
+        tabela = payload["snapshot"]["tabelas"][0]
+        tabela.update(descricao="Cada registro representa um cliente.", regras="", tipo_principal="Cadastro",
+                      tipo_descricao="", descricao_aprovada=True)
+        status, saved = self.request("POST", "/analises", payload)
+        self.assertEqual(status, 201, saved)
+        self.session.expire_all()
+        loaded = self.request("GET", f'/analises/{saved["id"]}')[1]
+        self.assertEqual(loaded["conteudo"]["tabelas"][0], tabela)
+        for campos in ({"descricao": " "}, {"tipo_principal": ""}, {"tipo_principal": "inválido"},
+                       {"tipo_principal": "Outro / Não sei", "tipo_descricao": ""}):
+            original = tabela.copy()
+            tabela.update(campos)
+            self.assertEqual(self.request("PUT", f'/analises/{saved["id"]}', payload)[0], 422)
+            tabela.update(original)
+        tabela.update(tipo_principal="Outro / Não sei", tipo_descricao="Tabela mista.")
+        self.assertEqual(self.request("PUT", f'/analises/{saved["id"]}', payload)[0], 200)
+
     def test_saved_analysis_round_trip_and_creation_date(self):
         payload = self.analysis_payload()
         with patch.object(catalogo, "abrir_catalogo") as remote:

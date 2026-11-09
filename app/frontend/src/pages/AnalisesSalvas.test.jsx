@@ -30,6 +30,30 @@ function abrir(path, state) {
   </Routes></MemoryRouter>);
 }
 
+it('salva e reabre as respostas e a aprovação da descrição de tabela', async () => {
+  abrir('/analises_salvas/7');
+  await screen.findByRole('heading', { name: 'Mapa comercial' });
+  fireEvent.click(screen.getByRole('button', { name: 'Ver metadados de public.clientes' }));
+  let painel = screen.getByRole('region', { name: 'Descrição da tabela' });
+  fireEvent.change(within(painel).getByLabelText('O que esta tabela representa no sistema de origem?'), { target: { value: 'Cada registro representa um cliente.' } });
+  fireEvent.click(within(painel).getByLabelText('Cadastro'));
+  fireEvent.click(within(painel).getByRole('button', { name: 'Aprovar descrição de tabela' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+  fireEvent.click(within(screen.getByRole('region', { name: 'Salvar análise' })).getByRole('button', { name: 'Salvar alterações' }));
+  await screen.findByText('Análise salva com sucesso no EncilhaDB.');
+  const conteudo = api.salvarAnalise.mock.results[0];
+  const salvo = await conteudo.value;
+  expect(salvo.conteudo.tabelas[0]).toMatchObject({ descricao: 'Cada registro representa um cliente.', tipo_principal: 'Cadastro', descricao_aprovada: true });
+  cleanup();
+  api.buscarAnalise.mockResolvedValue(salvo);
+  abrir('/analises_salvas/7');
+  await screen.findByRole('heading', { name: 'Mapa comercial' });
+  fireEvent.click(screen.getByRole('button', { name: 'Ver metadados de public.clientes' }));
+  painel = screen.getByRole('region', { name: 'Descrição da tabela' });
+  expect(within(painel).getByLabelText('O que esta tabela representa no sistema de origem?').value).toBe('Cada registro representa um cliente.');
+  expect(within(painel).getByRole('img', { name: 'Descrição de tabela aprovada' })).toBeDefined();
+});
+
 it('lista análises com nome, descrição, database, data e link para reabrir', async () => {
   abrir('/analises_salvas');
   expect(screen.getByRole('status').textContent).toContain('Carregando análises');
@@ -67,8 +91,8 @@ it('reabre pelo endereço sem estado de navegação e restaura o grafo e confirm
   fireEvent.click(screen.getByRole('button', { name: 'Ver metadados de public.clientes' }));
   const painel = screen.getByRole('region', { name: 'Ligações da tabela selecionada' });
   expect(within(painel).getByRole('img', { name: 'Relação confirmada' })).toBeDefined();
-  expect(within(painel).getByText('Pedidos do cliente')).toBeDefined();
-  expect(within(painel).getByText('Relação revisada.')).toBeDefined();
+  expect(within(painel).getByText('manual')).toBeDefined();
+  expect(within(painel).queryByText('Relação revisada.')).toBeNull();
 });
 
 it('salva alterações permitindo editar a descrição e mantendo nome, id e data de criação', async () => {
@@ -77,7 +101,6 @@ it('salva alterações permitindo editar a descrição e mantendo nome, id e dat
   fireEvent.click(screen.getByRole('button', { name: 'Ver metadados de public.clientes' }));
   fireEvent.click(within(screen.getByRole('region', { name: 'Ligações da tabela selecionada' })).getByRole('button', { name: 'Editar' }));
   const editor = screen.getByRole('region', { name: 'Editar relação' });
-  fireEvent.change(within(editor).getByLabelText('Título da relação'), { target: { value: 'Pedidos revisados' } });
   fireEvent.click(within(editor).getByRole('button', { name: 'Salvar relação' }));
   expect(await screen.findByText('Há alterações não salvas nesta análise.')).toBeDefined();
   fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
@@ -92,7 +115,7 @@ it('salva alterações permitindo editar a descrição e mantendo nome, id e dat
   expect(screen.getByRole('heading', { name: 'Mapa comercial' })).toBeDefined();
   expect(api.salvarAnalise.mock.calls[0][1]).toBe(7);
   expect(api.salvarAnalise.mock.calls[0][0]).toMatchObject({ nome: 'Mapa comercial', descricao: 'Descrição atualizada' });
-  expect(api.salvarAnalise.mock.calls[0][0].snapshot.relacoes[0]).toMatchObject({ confirmada: false, titulo: 'Pedidos revisados' });
+  expect(api.salvarAnalise.mock.calls[0][0].snapshot.relacoes[0]).toMatchObject({ confirmada: false, nome: 'Relação editada na análise' });
   expect(screen.getByText(`Data de criação: ${new Date(registro.data_criacao).toLocaleString('pt-BR')}.`)).toBeDefined();
 });
 

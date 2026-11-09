@@ -1,8 +1,6 @@
 import { useState } from 'react';
 
 export default function EditarRelacao({ tabelas, relacao, onSalvar, onCancelar, criacao = false }) {
-  const [titulo, setTitulo] = useState(relacao.titulo || '');
-  const [descricao, setDescricao] = useState(relacao.descricao || '');
   const [origem, setOrigem] = useState(relacao.origem);
   const [destino, setDestino] = useState(relacao.destino);
   const [pares, setPares] = useState(() => relacao.colunas_origem.map((coluna, i) => ({ origem: coluna, destino: relacao.colunas_destino[i] || '' })));
@@ -31,19 +29,13 @@ export default function EditarRelacao({ tabelas, relacao, onSalvar, onCancelar, 
     }
     const mensagem = onSalvar({ ...relacao, origem, destino, colunas_origem: pares.map(p => p.origem),
       colunas_destino: pares.map(p => p.destino), tipo: 'manual', confirmada: false,
-      titulo: titulo.trim(), descricao: descricao.trim(), nome: criacao ? 'Relação criada na análise' : 'Relação editada na análise' });
+      nome: criacao ? 'Relação criada na análise' : 'Relação editada na análise' });
     if (mensagem) setErro(mensagem);
   };
   return <section className="analise-painel editor-relacao" aria-label={criacao ? 'Criar relação' : 'Editar relação'}>
     <h2>{criacao ? 'Criar relação' : 'Editar relação'}</h2>
     <p className="dica">Escolha a tabela principal (origem), a tabela que ela referencia e os pares de colunas. A alteração é aplicada à análise.</p>
     <form onSubmit={salvar}>
-      <label>Título da relação
-        <input type="text" value={titulo} maxLength={150} onChange={e => setTitulo(e.target.value)} placeholder="Ex.: Pedidos do cliente" />
-      </label>
-      <label>Descrição da relação
-        <textarea value={descricao} maxLength={2000} rows={3} onChange={e => setDescricao(e.target.value)} placeholder="Descreva como estas tabelas se relacionam." />
-      </label>
       <p className="dica">Após salvar, a relação fica pendente de confirmação.</p>
       <div className="relacao-campos">
         <label>Tabela principal (origem)

@@ -3,9 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import GrafoRelacoes from '../components/GrafoRelacoes.jsx';
 import EditarRelacao from '../components/EditarRelacao.jsx';
 import SalvarAnaliseForm from '../components/SalvarAnaliseForm.jsx';
+import DescricaoTabela from '../components/DescricaoTabela.jsx';
+import Confirmacao from '../components/Confirmacao.jsx';
 
 const tipoRelacao = r => r.confirmada === true ? 'Relação' : 'Possível relação';
-const confirmacao = r => r.confirmada === true ? <span className="relacao-confirmada" role="img" aria-label="Relação confirmada" title="Relação confirmada">✓</span> : null;
+const confirmacao = r => r.confirmada === true ? <Confirmacao rotulo="Relação confirmada" /> : null;
 const assinatura = r => JSON.stringify([r.origem, r.destino, r.colunas_origem.map((c, i) => JSON.stringify([c, r.colunas_destino[i]])).sort()]);
 
 export default function ResultadoAnalise({ analiseSalva }) {
@@ -19,7 +21,7 @@ export default function ResultadoAnalise({ analiseSalva }) {
   const [mensagem, setMensagem] = useState(state?.avisoSalvamento || '');
   const [formSalvar, setFormSalvar] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const relacoes = useMemo(() => analise?.relacoes.filter(r => mostrarSugestoes || r.confirmada === true) || [], [analise, mostrarSugestoes]);
+  const relacoes = useMemo(() => analise?.relacoes.filter(r => mostrarSugestoes || r.confirmada === true) || [], [analise?.relacoes, mostrarSugestoes]);
   if (!analise) return <div className="container-form">
     <h1>Análise de metadados</h1>
     <p className="vazio">Nenhuma análise carregada. Selecione as tabelas para executar uma análise.</p>
@@ -30,6 +32,10 @@ export default function ResultadoAnalise({ analiseSalva }) {
   const tabela = analise.tabelas.find(t => t.id === selecionada);
   const ligacoesTabela = relacoes.filter(r => r.origem === selecionada || r.destino === selecionada);
   const nomeTabela = id => { const t = analise.tabelas.find(t => t.id === id); return t ? `${t.schema}.${t.nome}` : id; };
+  const atualizarTabela = atualizada => {
+    navigate({ pathname, search, hash }, { replace: true, state: { ...state,
+      analise: { ...analise, tabelas: analise.tabelas.map(t => t.id === atualizada.id ? atualizada : t) }, alterada: true } });
+  };
   const atualizarRelacoes = novas => {
     const ligadas = new Set(novas.flatMap(r => [r.origem, r.destino]));
     const atualizada = { ...analise, relacoes: novas, sem_relacao: analise.tabelas.filter(t => !ligadas.has(t.id)).map(t => t.id) };
@@ -108,12 +114,13 @@ export default function ResultadoAnalise({ analiseSalva }) {
         <tbody>{ligacoesTabela.map((r, i) => <tr key={i}>
           <td><button type="button" onClick={() => setSelecionada(r.origem)}>{nomeTabela(r.origem)}</button></td><td>{r.colunas_origem.join(', ')}</td>
           <td><button type="button" onClick={() => setSelecionada(r.destino)}>{nomeTabela(r.destino)}</button></td><td>{r.colunas_destino.join(', ')}</td>
-          <td>{confirmacao(r)} {tipoRelacao(r)}<div className="titulo-relacao">{r.titulo || r.nome}</div>{r.descricao && <p className="descricao-relacao">{r.descricao}</p>}</td>
+          <td>{confirmacao(r)} {tipoRelacao(r)}<div className="titulo-relacao">{r.nome}</div></td>
           <td>{acoes(r)}</td>
         </tr>)}</tbody>
       </table></div> : <p className="vazio">Nenhuma ligação encontrada para esta tabela com o filtro atual.</p>}
     </section>}
     {edicao && <EditarRelacao key={edicao.criacao ? `nova-${edicao.relacao.origem}` : edicao.indice} criacao={edicao.criacao} tabelas={analise.tabelas} relacao={edicao.relacao} onSalvar={salvarRelacao} onCancelar={() => setEdicao(null)} />}
+    {tabela && <DescricaoTabela tabela={tabela} onAtualizar={atualizarTabela} disabled={salvando} />}
     {tabela && <section className="analise-painel" aria-label="Metadados da tabela">
       <h2>Metadados: {tabela.schema}.{tabela.nome}</h2>
       <div className="tabela-rolagem"><table>
@@ -123,8 +130,7 @@ export default function ResultadoAnalise({ analiseSalva }) {
     </section>}
     <details className="analise-painel"><summary>Detalhes das relações ({relacoes.length})</summary>
       {relacoes.length ? <ul>{relacoes.map((r, i) => <li key={i}>
-        {confirmacao(r)} {nomeTabela(r.origem)} ({r.colunas_origem.join(', ')}) → {nomeTabela(r.destino)} ({r.colunas_destino.join(', ')}) — {tipoRelacao(r)}: {r.titulo || r.nome}
-        {r.descricao && <p className="descricao-relacao">{r.descricao}</p>}
+        {confirmacao(r)} {nomeTabela(r.origem)} ({r.colunas_origem.join(', ')}) → {nomeTabela(r.destino)} ({r.colunas_destino.join(', ')}) — {tipoRelacao(r)}: {r.nome}
         {acoes(r)}
       </li>)}</ul> : <p className="vazio">Nenhuma relação encontrada.</p>}
     </details>
